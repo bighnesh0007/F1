@@ -15,11 +15,14 @@ import { SessionBar } from "@/components/live/SessionBar";
 import { TimingTower, useTowerRows } from "@/components/live/TimingTower";
 import { LiveTrackMap } from "@/components/live/LiveTrackMap";
 import { BattlesPanel, WeatherPanel } from "@/components/live/SidePanels";
-import { DriverSheet } from "@/components/live/DriverSheet";
+import dynamic from "next/dynamic";
 import { LatestMessageBanner, RaceControlList, useRaceControl } from "./RaceControl";
 import { RadioPlayer } from "./RadioPlayer";
 import { DriverFocus } from "./DriverFocus";
 import { LiveChampionship, PitStops } from "./PitsAndTitle";
+
+// Charts in the driver sheet load when it is first opened.
+const DriverSheet = dynamic(() => import("@/components/live/DriverSheet").then((m) => m.DriverSheet));
 
 type SideTab = "control" | "radio" | "pits" | "title";
 type MobileTab = "track" | "timing" | "driver" | "control" | "radio";

@@ -30,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* Apply the saved theme before first paint to avoid a flash. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var s=JSON.parse(localStorage.getItem("f1live.settings")||"{}");if(s.theme&&s.theme!=="system")document.documentElement.setAttribute("data-theme",s.theme)}catch(e){}`,
+            __html: `try{var s=JSON.parse(localStorage.getItem("f1live.settings")||"{}");var r=document.documentElement;if(s.theme&&s.theme!=="system")r.setAttribute("data-theme",s.theme);if(s.colourBlind)r.setAttribute("data-cb","");if(s.reduceMotion)r.setAttribute("data-reduce-motion","")}catch(e){}`,
           }}
         />
       </head>

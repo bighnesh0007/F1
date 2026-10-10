@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Bell, Eye, EyeOff, Moon, Palette, Star, Sun, Monitor, Volume2, Zap, LayoutGrid } from "lucide-react";
+import { Accessibility, ArrowDown, ArrowUp, Bell, Eye, EyeOff, Moon, Palette, Star, Sun, Monitor, Volume2, Zap, LayoutGrid } from "lucide-react";
 import { useSettings, type LivePanel } from "@/lib/settings";
 import { useDrivers } from "@/lib/drivers";
 import { sounds } from "@/lib/sound";
@@ -81,6 +81,21 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
             hint={settings.favouriteDriver ? "Use your favourite driver's team colour." : "Pick a favourite driver first."}
             checked={settings.teamAccent}
             onChange={(teamAccent) => update({ teamAccent })}
+          />
+        </Section>
+
+        <Section icon={<Accessibility size={16} />} title="Accessibility">
+          <Toggle
+            label="Colour-blind friendly colours"
+            hint="Blue and orange instead of green and red for personal bests, gains and warnings."
+            checked={settings.colourBlind}
+            onChange={(colourBlind) => update({ colourBlind })}
+          />
+          <Toggle
+            label="Reduce motion"
+            hint="Turns off animations and flag effects. Your device's reduced-motion setting is always respected."
+            checked={settings.reduceMotion}
+            onChange={(reduceMotion) => update({ reduceMotion })}
           />
         </Section>
 

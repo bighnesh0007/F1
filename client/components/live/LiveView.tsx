@@ -12,7 +12,10 @@ import { TimingTower } from "./TimingTower";
 import { LiveTrackMap } from "./LiveTrackMap";
 import { Insights } from "./Insights";
 import { BattlesPanel, FeedPanel, RadioPanel, WeatherPanel } from "./SidePanels";
-import { DriverSheet } from "./DriverSheet";
+import dynamic from "next/dynamic";
+
+// Charts in the driver sheet load when it is first opened.
+const DriverSheet = dynamic(() => import("./DriverSheet").then((m) => m.DriverSheet));
 
 type MobileTab = "timing" | "track" | "feed" | "insights";
 

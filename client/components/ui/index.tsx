@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { EyeOff, X } from "lucide-react";
 import { TYRES } from "@/lib/live";
@@ -148,12 +148,38 @@ export function Spoiler({ children, label = "Result hidden", className }: { chil
 }
 
 export function Sheet({ open, onClose, title, children, side = "right" }: { open: boolean; onClose: () => void; title: React.ReactNode; children: React.ReactNode; side?: "right" | "bottom" }) {
+  const panel = useRef<HTMLElement>(null);
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  });
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    // Move focus into the sheet, keep Tab inside it, and give focus back on close.
+    const before = document.activeElement as HTMLElement | null;
+    const focusFirst = setTimeout(() => panel.current?.querySelector<HTMLElement>("button, [href], input, [tabindex]")?.focus(), 50);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close.current();
+      if (e.key !== "Tab" || !panel.current) return;
+      const items = [...panel.current.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((el) => !el.hasAttribute("disabled"));
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+    return () => {
+      clearTimeout(focusFirst);
+      window.removeEventListener("keydown", onKey);
+      before?.focus?.();
+    };
+  }, [open]);
 
   return (
     <AnimatePresence>
@@ -161,8 +187,10 @@ export function Sheet({ open, onClose, title, children, side = "right" }: { open
         <div className="fixed inset-0 z-50">
           <motion.div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} />
           <motion.aside
+            ref={panel}
             role="dialog"
             aria-modal="true"
+            aria-label={typeof title === "string" ? title : undefined}
             className={cn(
               "absolute flex flex-col bg-surface shadow-2xl",
               side === "right" ? "top-0 right-0 h-full w-full max-w-md border-l border-line" : "inset-x-0 bottom-0 max-h-[85vh] rounded-t-3xl border-t border-line",

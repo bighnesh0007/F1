@@ -20,7 +20,7 @@ class HttpError extends Error {
 
 const MAX_POINTS = 300;
 // Points from championship position: favourites are worth less, outsiders more.
-const driverPoints = (position) => Math.min(MAX_POINTS, Math.round(25 * 1.28 ** ((position ?? 15) - 1)));
+export const driverPoints = (position) => Math.min(MAX_POINTS, Math.round(25 * 1.28 ** ((position ?? 15) - 1)));
 
 const MARKET_INFO = {
   winner: { title: 'Race winner', lock: 'Race', hint: 'Who takes the chequered flag first?' },
@@ -130,7 +130,7 @@ async function removePick(user, { season, round, market }) {
 }
 
 // Decides a prediction from official results; null when the result isn't known yet.
-function outcome(p, data) {
+export function outcome(p, data) {
   const { race, quali, sprint } = data;
   const base = p.market.split(':')[0];
   switch (base) {

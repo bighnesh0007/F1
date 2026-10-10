@@ -1,9 +1,9 @@
 "use client";
 
-import { CloudRain, Droplets, Thermometer, Timer, Wind } from "lucide-react";
+import { CloudRain, Droplets, Thermometer, Timer, Wind, WifiOff } from "lucide-react";
 import { useLive } from "@/lib/live-context";
 import { TRACK_STATUS } from "@/lib/live";
-import { countryFlag } from "@/lib/format";
+import { countryFlag, localTime } from "@/lib/format";
 import { useNow } from "@/lib/useNow";
 import { cn } from "@/components/ui";
 
@@ -15,16 +15,21 @@ const TONES = {
 };
 
 export function SessionBar({ action }: { action?: React.ReactNode }) {
-  const { topics, connection, streamOpen } = useLive();
+  const { topics, connection, streamOpen, staleSince } = useLive();
   const info = topics.SessionInfo;
   const track = TRACK_STATUS[String(topics.TrackStatus?.Status)];
   const lap = topics.LapCount;
   const weather = topics.WeatherData;
   const raining = Number(weather?.Rainfall) > 0;
-  const live = streamOpen && connection?.status === "connected";
+  const live = streamOpen && staleSince == null && connection?.status === "connected";
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+      {staleSince != null && (
+        <p role="status" className="flex items-center gap-2 border-b border-line bg-yellow/15 px-5 py-1.5 text-xs font-semibold text-ink">
+          <WifiOff size={13} /> No connection. Showing the last timing received at {localTime(new Date(staleSince).toISOString(), { second: "2-digit" })}; it updates again once you&apos;re back online.
+        </p>
+      )}
       <div className="absolute inset-y-0 left-0 w-1 bg-accent" />
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3.5">
         <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">
@@ -87,13 +92,14 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
 
 // ExtrapolatedClock gives the remaining time at a moment; count down from it locally.
 function Clock() {
-  const { topics, feedNow } = useLive();
+  const { topics, feedNow, staleSince } = useLive();
   const now = useNow(1000);
   const clock = topics.ExtrapolatedClock;
   if (!clock?.Remaining || now == null) return null;
   const [h, m, s] = String(clock.Remaining).split(":").map(Number);
   let remaining = (h * 3600 + m * 60 + s) * 1000;
-  if (clock.Extrapolating && clock.Utc) remaining -= feedNow() - Date.parse(clock.Utc);
+  // Without a connection the clock is frozen at the last value received.
+  if (clock.Extrapolating && clock.Utc && staleSince == null) remaining -= feedNow() - Date.parse(clock.Utc);
   const total = Math.max(0, Math.round(remaining / 1000));
   const text = `${Math.floor(total / 3600)}:${String(Math.floor((total % 3600) / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
   return (

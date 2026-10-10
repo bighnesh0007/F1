@@ -32,6 +32,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col">
+      <a href="#main" className="sr-only z-50 rounded-xl bg-accent px-4 py-2 font-semibold text-accent-ink focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
+        Skip to content
+      </a>
       <header className="sticky top-0 z-40 border-b border-line bg-bg/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-[1500px] items-center gap-6 px-4">
           <Link href="/" className="flex items-center gap-2 font-display text-xl font-bold tracking-tight">
@@ -40,7 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Live<span className="text-accent">.</span>
             </span>
           </Link>
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
             <Suspense fallback={<NavLinks live={live} variant="top" pathname={null} />}>
               <ActiveNavLinks live={live} variant="top" />
             </Suspense>
@@ -75,7 +78,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 pt-4 pb-24 md:pb-10">{children}</main>
+      <main id="main" tabIndex={-1} className="outline-none mx-auto w-full max-w-[1500px] flex-1 px-4 pt-4 pb-24 md:pb-10">{children}</main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
         <div className="grid grid-cols-6">

@@ -151,6 +151,8 @@ export function LatestMessageBanner() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
+          role="status"
+          aria-live="polite"
           className="pointer-events-none absolute inset-x-3 bottom-3 flex items-center gap-3 rounded-xl border border-line bg-surface/90 px-3 py-2 shadow-card backdrop-blur"
         >
           <span className="flex h-6 w-8 shrink-0 items-center justify-center rounded-md border border-line" style={swatch ? { background: swatch.bg } : undefined}>

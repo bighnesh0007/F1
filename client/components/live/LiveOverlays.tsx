@@ -62,18 +62,18 @@ export function LiveOverlays() {
         lastTrackStatus.current = event.status;
         const kind = ({ "4": "sc", "6": "vsc", "5": "red" } as const)[event.status as "4" | "6" | "5"];
         const resumed = event.status === "1" && prev && ["4", "5", "6", "7"].includes(prev);
-        if ((kind || resumed) && s.flagEffects) {
+        if ((kind || resumed) && s.flagEffects && !s.reduceMotion) {
           setFlag({ id: nextId.current++, kind: kind ?? "green" });
           if (s.sounds) sounds.flag();
         }
       }
 
       if (event.type === "sessionStatus") {
-        if ((event.status === "Finished" || event.status === "Ends") && s.flagEffects) {
+        if ((event.status === "Finished" || event.status === "Ends") && s.flagEffects && !s.reduceMotion) {
           setFlag({ id: nextId.current++, kind: "chequered" });
           if (s.sounds) sounds.chequered();
         }
-        if (event.status === "Started" && race && s.flagEffects) runLights();
+        if (event.status === "Started" && race && s.flagEffects && !s.reduceMotion) runLights();
       }
     });
 

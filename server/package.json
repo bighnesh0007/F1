@@ -9,7 +9,8 @@
   },
   "scripts": {
     "start": "node --env-file-if-exists=../.env src/index.js",
-    "dev": "node --env-file-if-exists=../.env --watch src/index.js"
+    "dev": "node --env-file-if-exists=../.env --watch src/index.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "@clerk/express": "^2.1.78",

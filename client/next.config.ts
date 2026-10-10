@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
   output: "standalone",
   cacheComponents: true,
   partialPrefetching: true,
+  // The service worker must always be re-checked so updates reach people quickly.
+  async headers() {
+    return [{ source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }, { key: "Service-Worker-Allowed", value: "/" }] }];
+  },
   turbopack: {
     rules: {
       "*.css": {

@@ -49,6 +49,10 @@ All configuration lives in one file: copy `.env.example` to `.env` in the projec
 
 **Settings**: favourite driver (highlighted everywhere, optional team-colour theme), dark/light theme, spoiler-free mode, alerts, flag effects, sounds, reminders, and which live panels show in what order. Installable as an app on phones and desktops.
 
+**Works offline**: the app keeps working on a bad connection. Pages and public F1 data are cached by a service worker, and the last live timing is kept on the device: if the connection drops (or you reopen the app without signal) you see the last timing received, clearly marked, until it reconnects.
+
+**Accessibility**: keyboard navigation everywhere (skip link, visible focus, cars on the map can be selected with Tab and Enter, dialogs keep focus inside), screen-reader labels and live announcements for race control, a colour-blind friendly palette (blue/orange instead of green/red), and a reduce-motion switch that also follows the device setting.
+
 ## Data sources
 
 | Source | Used for | Cost |
@@ -138,6 +142,23 @@ server/   Node.js + Express                                 → http://localhost
   src/db/             Redis and MongoDB connections
 docker-compose.yml
 ```
+
+## Tests and monitoring
+
+```bash
+cd server && npm test   # scoring, live feed parsing and events, auth checks
+cd client && npm test   # live state merging, map position estimate, formatting
+```
+
+GitHub Actions runs these plus lint, type checks and a production build on every push (`.github/workflows/ci.yml`).
+
+The server logs every failed or slow request (over `SLOW_REQUEST_MS`, default 1500 ms; `LOG_FORMAT=json` for log tools, `LOG_REQUESTS=1` to log everything). Browsers report crashes and page-speed numbers (Core Web Vitals) back to the server. Set `METRICS_TOKEN` to read the summary:
+
+```bash
+curl -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:4000/api/health/metrics
+```
+
+It shows response times per route (p50/p95), error counts, page-speed (LCP, INP, CLS…) and the latest browser errors.
 
 ## Run without Docker (development)
 

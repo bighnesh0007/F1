@@ -16,6 +16,8 @@ export type Settings = {
   reminders: boolean;
   reminderMinutes: number;
   livePanels: { id: LivePanel; visible: boolean }[];
+  colourBlind: boolean;
+  reduceMotion: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -35,6 +37,8 @@ export const DEFAULT_SETTINGS: Settings = {
     { id: "weather", visible: true },
     { id: "radio", visible: true },
   ],
+  colourBlind: false,
+  reduceMotion: false,
 };
 
 const STORAGE_KEY = "f1live.settings";
@@ -93,6 +97,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     if (settings.theme === "system") root.removeAttribute("data-theme");
     else root.setAttribute("data-theme", settings.theme);
   }, [settings.theme]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.toggleAttribute("data-cb", settings.colourBlind);
+    root.toggleAttribute("data-reduce-motion", settings.reduceMotion);
+  }, [settings.colourBlind, settings.reduceMotion]);
 
   useEffect(() => {
     const root = document.documentElement;

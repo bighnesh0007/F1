@@ -84,7 +84,11 @@ export function CarDot({ car, size, onClick, transitionMs }: { car: MapCar; size
   return (
     <g
       onClick={onClick}
-      className="cursor-pointer"
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `${car.tla}, show details` : undefined}
+      onKeyDown={onClick ? (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onClick()) : undefined}
+      className="cursor-pointer outline-none [&:focus-visible>circle:first-of-type]:stroke-[var(--accent)]"
       opacity={car.dim ? 0.35 : 1}
       style={{ transform: `translate(${car.x}px, ${car.y}px)`, transition: transitionMs ? `transform ${transitionMs}ms linear` : undefined }}
     >

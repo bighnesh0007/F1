@@ -11,12 +11,15 @@ import { authMiddleware, authRouter, clerkConfigured, loadUser, requireJson, req
 import { profileRouter } from './profile.js';
 import { gameRouter, startScoringJob } from './game.js';
 import { calendarRouter } from './calendar.js';
+import { logCrashes, observeRouter, requestLog } from './observe.js';
 
 const PORT = Number(process.env.PORT) || 4000;
 const app = express();
 const live = new LiveTimingClient();
 
+logCrashes();
 app.set('trust proxy', true);
+app.use(requestLog());
 app.use(cors({ origin: process.env.CORS_ORIGIN || false }));
 app.use(express.json({ limit: '100kb' }));
 app.use(requireJson);
@@ -48,6 +51,8 @@ app.get('/api/health', (_req, res) => {
     clerk: clerkConfigured(),
   });
 });
+
+app.use('/api', observeRouter());
 
 // --- Accounts, profiles, game, calendar ------------------------------------------------
 
