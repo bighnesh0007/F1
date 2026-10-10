@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.9.14",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource/titillium-web": "^5.3.0",
     "lucide-react": "^1.55.0",

@@ -7,15 +7,15 @@ import { readableInk } from "@/lib/settings";
 import { teamById } from "@/lib/teams";
 import type { Badge } from "@/lib/types-user";
 import { Card, ErrorNote, Skeleton, cn } from "@/components/ui";
-import { Avatar, Coins } from "./Avatar";
+import { Avatar, Points } from "./Avatar";
 
 type PublicProfile = {
   handle: string;
   displayName: string;
   avatarUrl: string | null;
   profile: { team: string | null; driverName: string | null; country: string | null; fanSince: number | null; bio: string | null; quizResult: string | null };
-  stats: { bets: number; won: number; profit: number };
-  coins: number;
+  stats: { picks: number; correct: number };
+  points: number;
   joined: string;
   badges: Badge[];
 };
@@ -41,7 +41,7 @@ export function PublicProfileView() {
               {data.profile.fanSince ? ` · fan since ${data.profile.fanSince}` : ""}
             </p>
           </div>
-          <div className="rounded-2xl bg-surface/90 px-4 py-2.5 shadow-card"><Coins value={data.coins} className="text-xl" /></div>
+          <div className="rounded-2xl bg-surface/90 px-4 py-2.5 shadow-card"><Points value={data.points} className="text-xl" /></div>
         </div>
       </section>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -50,7 +50,7 @@ export function PublicProfileView() {
           <dl className="mt-3 space-y-1 text-sm">
             {data.profile.driverName && <div className="flex justify-between"><dt className="text-muted">Favourite driver</dt><dd className="font-medium">{data.profile.driverName}</dd></div>}
             {quiz && <div className="flex justify-between"><dt className="text-muted">Quiz says</dt><dd className="font-medium">{quiz.tribe}</dd></div>}
-            <div className="flex justify-between"><dt className="text-muted">Predictions</dt><dd className="font-medium">{data.stats.won}/{data.stats.bets} won</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">Predictions</dt><dd className="font-medium">{data.stats.correct}/{data.stats.picks} correct</dd></div>
           </dl>
         </Card>
         <Card title="Badges" icon={<Trophy size={15} />}>

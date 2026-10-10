@@ -22,10 +22,10 @@ export function Avatar({ name, src, team, size = 36, className }: { name: string
   );
 }
 
-export function Coins({ value, className }: { value: number; className?: string }) {
+export function Points({ value, className }: { value: number; className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1 font-display font-bold tnum", className)} title="Pit Coins (just for fun, no monetary value)">
-      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 text-[9px] text-amber-950">P</span>
+    <span className={cn("inline-flex items-center gap-1 font-display font-bold tnum", className)} title="Prediction points">
+      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] text-accent-ink">PTS</span>
       {value.toLocaleString()}
     </span>
   );

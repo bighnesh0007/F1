@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { CalendarPlus, Check, ChevronDown, Copy, ExternalLink, Loader2, PartyPopper, Rss, Download, Video } from "lucide-react";
 import { api, useAuth } from "@/lib/auth";
@@ -9,6 +8,8 @@ import { downloadWeekendIcs } from "@/lib/ics";
 import { localDay, localTime } from "@/lib/format";
 import type { Race } from "@/lib/types";
 import { Sheet, cn } from "@/components/ui";
+import { clerkEnabled } from "@/lib/clerk";
+import { ConnectGoogleCalendarButton, SignInCta } from "@/components/account/ClerkControls";
 
 const DURATION_MIN: Record<string, number> = { Race: 120, Sprint: 60 };
 const gcalDate = (ms: number) => new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
@@ -28,15 +29,13 @@ export function googleTemplateLink(race: Race, sessionKey = "Race") {
 }
 
 export function CalendarMenu({ race, variant = "button" }: { race: Race; variant?: "button" | "icon" }) {
-  const { user, googleAvailable } = useAuth();
-  const pathname = usePathname();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [party, setParty] = useState(false);
   const [status, setStatus] = useState<{ busy?: boolean; text?: string; ok?: boolean }>({});
   const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const connected = Boolean(user?.google.calendar);
-  const connectHref = `/api/auth/google?calendar=1&next=${encodeURIComponent(pathname)}`;
 
   useEffect(() => {
     if (!open) return;
@@ -96,14 +95,14 @@ export function CalendarMenu({ race, variant = "button" }: { race: Race; variant
                   <CalendarPlus size={16} className="text-accent" /> Add every remaining race weekend
                 </button>
               </>
-            ) : googleAvailable ? (
-              <a href={user ? connectHref : `${connectHref}`} className={item}>
+            ) : clerkEnabled && user ? (
+              <ConnectGoogleCalendarButton className={item}>
                 <CalendarPlus size={16} className="text-accent" />
                 <span>
-                  {user ? "Connect Google Calendar" : "Sign in with Google"}
+                  Connect Google Calendar
                   <span className="block text-xs text-muted">Then add whole weekends in one tap</span>
                 </span>
-              </a>
+              </ConnectGoogleCalendarButton>
             ) : null}
             <a href={googleTemplateLink(race)} target="_blank" rel="noreferrer" className={item}>
               <ExternalLink size={16} className="text-faint" />
@@ -147,12 +146,12 @@ export function CalendarMenu({ race, variant = "button" }: { race: Race; variant
           </motion.div>
         )}
       </AnimatePresence>
-      <WatchPartySheet race={race} open={party} onClose={() => setParty(false)} connected={connected} connectHref={connectHref} googleAvailable={googleAvailable} signedIn={Boolean(user)} />
+      <WatchPartySheet race={race} open={party} onClose={() => setParty(false)} connected={connected} signedIn={Boolean(user)} />
     </div>
   );
 }
 
-function WatchPartySheet({ race, open, onClose, connected, connectHref, googleAvailable, signedIn }: { race: Race; open: boolean; onClose: () => void; connected: boolean; connectHref: string; googleAvailable: boolean; signedIn: boolean }) {
+function WatchPartySheet({ race, open, onClose, connected, signedIn }: { race: Race; open: boolean; onClose: () => void; connected: boolean; signedIn: boolean }) {
   const [session, setSession] = useState(race.sessions.at(-1)?.key ?? "Race");
   const [guests, setGuests] = useState("");
   const [early, setEarly] = useState(30);
@@ -186,12 +185,12 @@ function WatchPartySheet({ race, open, onClose, connected, connectHref, googleAv
       {!connected ? (
         <div className="space-y-3 text-sm">
           <p>Watch parties are created in your Google Calendar: friends get an invite, and there&apos;s a Google Meet link if you&apos;re watching apart.</p>
-          {googleAvailable ? (
-            <a href={connectHref} className="inline-block rounded-xl bg-accent px-4 py-2 font-semibold text-accent-ink">
-              {signedIn ? "Connect Google Calendar" : "Sign in with Google"}
-            </a>
+          {!clerkEnabled ? (
+            <p className="text-muted">Sign-in isn&apos;t set up on this server yet (see the README).</p>
+          ) : signedIn ? (
+            <ConnectGoogleCalendarButton className="inline-block rounded-xl bg-accent px-4 py-2 font-semibold text-accent-ink">Connect Google Calendar</ConnectGoogleCalendarButton>
           ) : (
-            <p className="text-muted">Google sign-in isn&apos;t set up on this server yet (see the README).</p>
+            <SignInCta label="Sign in to plan a watch party" />
           )}
         </div>
       ) : result ? (

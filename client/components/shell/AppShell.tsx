@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 import { Suspense, useState } from "react";
 import { BarChart3, CalendarDays, History, Radio, Settings2, Ticket, Trophy } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { Avatar, Coins } from "@/components/account/Avatar";
+import { clerkEnabled } from "@/lib/clerk";
+import { Points } from "@/components/account/Avatar";
+import { HeaderAuth } from "@/components/account/ClerkControls";
 import { useLive } from "@/lib/live-context";
 import { sessionIsActive } from "@/lib/live";
 import { cn } from "@/components/ui";
@@ -26,7 +28,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { topics, connection } = useLive();
   const live = sessionIsActive(topics, connection);
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -49,17 +51,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <span className="live-dot h-1.5 w-1.5 rounded-full bg-accent-ink" /> LIVE
               </Link>
             )}
-            {!loading &&
-              (user ? (
-                <Link href="/profile" className="flex items-center gap-2 rounded-full border border-line bg-surface py-0.5 pr-3 pl-0.5 shadow-card hover:border-line-strong" title="Your profile">
-                  <Avatar name={user.displayName} src={user.avatarUrl} team={user.profile.team} size={28} />
-                  <Coins value={user.coins} className="text-sm" />
-                </Link>
-              ) : (
-                <Link href="/login" className="rounded-xl bg-accent px-3 py-1.5 text-sm font-semibold text-accent-ink">
-                  Sign in
-                </Link>
-              ))}
+            {clerkEnabled ? (
+              <HeaderAuth
+                signedInExtra={
+                  <Link href="/profile" className="flex items-center rounded-full border border-line bg-surface px-3 py-1 shadow-card hover:border-line-strong" title="Your profile">
+                    <Points value={user?.points ?? 0} className="text-sm" />
+                  </Link>
+                }
+              />
+            ) : (
+              <Link href="/sign-in" className="rounded-xl px-3 py-1.5 text-sm font-semibold text-muted hover:text-ink">
+                Sign in
+              </Link>
+            )}
             <button
               onClick={() => setSettingsOpen(true)}
               aria-label="Settings"

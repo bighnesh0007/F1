@@ -6,7 +6,7 @@ export type User = {
   displayName: string;
   email: string | null;
   avatarUrl: string | null;
-  coins: number;
+  points: number;
   profile: {
     team?: string | null;
     driver?: string | null;
@@ -17,20 +17,18 @@ export type User = {
     quizResult?: string | null;
   };
   settings: Record<string, unknown> | null;
-  stats: { bets?: number; won?: number; staked?: number; returned?: number; biggestStake?: number };
+  stats: { picks?: number; correct?: number; points?: number; bestPick?: number };
   createdAt: string;
-  hasPassword: boolean;
   google: { linked: boolean; calendar: boolean };
-  lastDailyBonus: string | null;
 };
 
 export type Badge = { id: string; title: string; description: string; earned: boolean };
 
-export type MarketOption = { id: string; label: string; code?: string; team?: string; odds: number };
+export type MarketOption = { id: string; label: string; code?: string; team?: string; points: number };
 export type Market = { key: string; title: string; hint: string; lockAt: string; team?: string; options: MarketOption[] };
 export type Markets = { season: number; round: number; name: string; markets: Market[] };
 
-export type Bet = {
+export type Prediction = {
   _id: string;
   season: number;
   round: number;
@@ -39,14 +37,12 @@ export type Bet = {
   marketTitle: string;
   pick: string;
   pickLabel: string;
-  odds: number;
-  stake: number;
-  status: "open" | "won" | "lost" | "void";
-  payout?: number;
+  points: number;
+  status: "open" | "correct" | "wrong" | "void";
+  earned?: number;
   lockAt: string;
-  createdAt: string;
 };
 
-export type LeaderboardEntry = { handle: string; displayName: string; avatarUrl: string | null; team: string | null; coins: number; profit: number; won: number; bets: number };
+export type LeaderboardEntry = { handle: string; displayName: string; avatarUrl: string | null; team: string | null; points: number; correct: number; picks: number };
+export type TribeScore = { team: string; fans: number; points: number; average: number };
 export type League = { code: string; name: string; members: number; owner: boolean };
-export type LedgerEntry = { _id: string; amount: number; type: string; note: string; at: string };

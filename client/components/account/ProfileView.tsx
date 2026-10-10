@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Award, CalendarCheck2, Check, Copy, Gift, Loader2, LogOut, Lock, Sparkles, Trash2, Trophy } from "lucide-react";
+import { Award, CalendarCheck2, Check, Copy, Gift, Loader2, LogOut, Lock, Settings2, Sparkles, Trash2, Trophy } from "lucide-react";
 import { api, useAuth } from "@/lib/auth";
 import { useApi } from "@/lib/useApi";
 import { useDrivers } from "@/lib/drivers";
@@ -12,13 +12,15 @@ import { readableInk, useSettings } from "@/lib/settings";
 import { QUIZ, TEAMS, scoreQuiz, teamById, type Team } from "@/lib/teams";
 import type { Badge, User } from "@/lib/types-user";
 import { Card, Sheet, Skeleton, cn } from "@/components/ui";
-import { Avatar, Coins } from "./Avatar";
+import { Avatar, Points } from "./Avatar";
+import { clerkEnabled } from "@/lib/clerk";
+import { ConnectGoogleCalendarButton, useClerkActions } from "./ClerkControls";
 
 export function ProfileView() {
   const { user, loading } = useAuth();
   const router = useRouter();
   useEffect(() => {
-    if (!loading && !user) router.replace("/login?next=/profile");
+    if (!loading && !user) router.replace("/sign-in");
   }, [loading, user, router]);
   if (!user) return <Skeleton className="h-72 rounded-3xl" />;
   return <Profile user={user} />;
@@ -26,10 +28,9 @@ export function ProfileView() {
 
 function Profile({ user }: { user: User }) {
   const params = useSearchParams();
-  const { setUser, logout, googleAvailable } = useAuth();
-  const router = useRouter();
+  const { setUser } = useAuth();
   const { update } = useSettings();
-  const { data: profile } = useApi<{ badges: Badge[] }>(`/api/profile?v=${user.coins}-${user.profile.team}-${user.profile.quizResult}`);
+  const { data: profile } = useApi<{ badges: Badge[] }>(`/api/profile?v=${user.points}-${user.profile.team}-${user.profile.quizResult}-${user.google.calendar}`);
   const [quizOpen, setQuizOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(params.get("calendar") === "connected" ? "Google Calendar connected" : params.get("calendar") === "denied" ? "Calendar access wasn't granted" : null);
   const team = teamById(user.profile.team);
@@ -69,8 +70,8 @@ function Profile({ user }: { user: User }) {
             <p className={cn("text-sm", team ? "opacity-75" : "text-muted")} style={team ? { color: readableInk(`#${team.colour}`) } : undefined}>@{user.handle} · fan since {user.profile.fanSince ?? new Date(user.createdAt).getFullYear()}</p>
           </div>
           <div className="rounded-2xl bg-surface/90 px-4 py-2.5 text-right shadow-card backdrop-blur">
-            <p className="text-[11px] font-semibold text-muted">Balance</p>
-            <Coins value={user.coins} className="text-xl" />
+            <p className="text-[11px] font-semibold text-muted">Points</p>
+            <Points value={user.points} className="text-xl" />
           </div>
         </div>
       </section>
@@ -136,14 +137,8 @@ function Profile({ user }: { user: User }) {
               </div>
             )}
           </Card>
-          <ConnectionsCard user={user} googleAvailable={googleAvailable} />
-          <AccountCard
-            user={user}
-            onLogout={async () => {
-              await logout();
-              router.push("/");
-            }}
-          />
+          <ConnectionsCard user={user} />
+          {clerkEnabled && <AccountCard user={user} />}
         </div>
       </div>
 
@@ -242,23 +237,22 @@ function AboutForm({ user, save }: { user: User; save: (patch: Record<string, un
 
 function StatsCard({ user }: { user: User }) {
   const s = user.stats;
-  const winRate = s.bets ? Math.round(((s.won ?? 0) / s.bets) * 100) : 0;
-  const net = (s.returned ?? 0) - (s.staked ?? 0);
+  const accuracy = s.picks ? Math.round(((s.correct ?? 0) / s.picks) * 100) : 0;
   return (
     <Card
       title="Prediction stats"
       icon={<Trophy size={15} />}
       right={
         <Link href="/play" className="text-xs font-semibold text-accent">
-          Play →
+          Predict →
         </Link>
       }
     >
       <div className="grid grid-cols-3 gap-2">
         {[
-          ["Predictions", String(s.bets ?? 0)],
-          ["Won", `${s.won ?? 0} (${winRate}%)`],
-          ["Net coins", `${net > 0 ? "+" : ""}${net}`],
+          ["Calls", String(s.picks ?? 0)],
+          ["Correct", `${s.correct ?? 0} (${accuracy}%)`],
+          ["Best call", `${s.bestPick ?? 0} pts`],
         ].map(([label, value]) => (
           <div key={label} className="rounded-xl bg-surface-2 px-3 py-2">
             <p className="text-[10px] font-semibold tracking-wider text-faint uppercase">{label}</p>
@@ -270,52 +264,43 @@ function StatsCard({ user }: { user: User }) {
   );
 }
 
-function ConnectionsCard({ user, googleAvailable }: { user: User; googleAvailable: boolean }) {
+function ConnectionsCard({ user }: { user: User }) {
   const { refresh } = useAuth();
+  const params = useSearchParams();
+  // Coming back from Google: re-read the granted access from Clerk.
+  useEffect(() => {
+    if (!clerkEnabled || user.google.calendar) return;
+    const id = setTimeout(() => void api("/api/auth/refresh", { body: {} }).then(refresh, () => {}), 0);
+    return () => clearTimeout(id);
+  }, [params, user.google.calendar, refresh]);
   return (
     <Card title="Connections" icon={<CalendarCheck2 size={15} />}>
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold">Google Calendar</p>
           <p className="text-xs text-muted">
-            {!googleAvailable
-              ? "Not set up on this server (see README)."
-              : user.google.calendar
-                ? "Connected: add sessions and plan watch parties in one tap."
-                : "Add sessions to your calendar and invite friends to watch parties."}
+            {user.google.calendar ? "Connected: add sessions and plan watch parties in one tap." : "Add sessions to your calendar and invite friends to watch parties."}
           </p>
         </div>
-        {googleAvailable &&
-          (user.google.calendar ? (
-            <button
-              onClick={async () => {
-                await api("/api/auth/google/disconnect", { body: {} });
-                await refresh();
-              }}
-              className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink"
-            >
-              Disconnect
-            </button>
-          ) : (
-            // A full page load is needed: this API route redirects to Google.
-            // eslint-disable-next-line @next/next/no-html-link-for-pages
-            <a href="/api/auth/google?calendar=1&next=/profile" className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink">
-              Connect
-            </a>
-          ))}
+        {clerkEnabled && !user.google.calendar && (
+          <div className="shrink-0 text-right">
+            <ConnectGoogleCalendarButton className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink">Connect</ConnectGoogleCalendarButton>
+          </div>
+        )}
+        {user.google.calendar && <Check size={18} className="shrink-0 text-good" />}
       </div>
-      <p className="mt-3 text-xs text-faint">Your app settings (theme, favourite driver, alerts) are saved to your account and follow you to any device.</p>
+      <p className="mt-3 text-xs text-faint">Your app settings (theme, favourite driver, alerts) are saved to your profile and follow you to any device.</p>
     </Card>
   );
 }
 
-function AccountCard({ user, onLogout }: { user: User; onLogout: () => void }) {
+function AccountCard({ user }: { user: User }) {
   const [copied, setCopied] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [text, setText] = useState("");
-  const router = useRouter();
-  const { setUser } = useAuth();
+  const { openAccount, signOut } = useClerkActions();
   const url = typeof window !== "undefined" ? `${window.location.origin}/u/${user.handle}` : `/u/${user.handle}`;
+  const row = "flex w-full items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-left text-sm hover:bg-surface-3";
   return (
     <Card title="Account">
       <div className="space-y-2">
@@ -325,15 +310,18 @@ function AccountCard({ user, onLogout }: { user: User; onLogout: () => void }) {
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           }}
-          className="flex w-full items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-left text-sm hover:bg-surface-3"
+          className={row}
         >
           {copied ? <Check size={15} className="text-good" /> : <Copy size={15} className="text-faint" />}
           <span className="flex-1 truncate">{copied ? "Link copied" : "Share your public profile"}</span>
         </button>
-        <Link href={`/u/${user.handle}`} className="flex w-full items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-sm hover:bg-surface-3">
+        <Link href={`/u/${user.handle}`} className={row}>
           <Gift size={15} className="text-faint" /> View public profile
         </Link>
-        <button onClick={onLogout} className="flex w-full items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-sm hover:bg-surface-3">
+        <button onClick={openAccount} className={row}>
+          <Settings2 size={15} className="text-faint" /> Manage account (email, password, sign-in methods)
+        </button>
+        <button onClick={() => void signOut()} className={row}>
           <LogOut size={15} className="text-faint" /> Sign out
         </button>
         {!confirming ? (
@@ -342,15 +330,14 @@ function AccountCard({ user, onLogout }: { user: User; onLogout: () => void }) {
           </button>
         ) : (
           <div className="rounded-xl border border-red-500/40 p-3">
-            <p className="text-sm">This deletes your profile, predictions and coins for good. Type <b>DELETE</b> to confirm.</p>
+            <p className="text-sm">This deletes your account, profile and predictions for good. Type <b>DELETE</b> to confirm.</p>
             <div className="mt-2 flex gap-2">
               <input value={text} onChange={(e) => setText(e.target.value)} className="flex-1 rounded-lg border border-line bg-surface-2 px-2 py-1 text-sm outline-none" />
               <button
                 disabled={text !== "DELETE"}
                 onClick={async () => {
                   await api("/api/profile", { method: "DELETE", body: {} });
-                  setUser(null);
-                  router.push("/");
+                  await signOut();
                 }}
                 className="rounded-lg bg-red-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-40"
               >

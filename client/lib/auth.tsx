@@ -2,17 +2,18 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSettings, type Settings } from "./settings";
+import { clerkEnabled } from "./clerk";
 import type { User } from "./types-user";
 
 type AuthCtx = {
+  /** The app profile (tribe, points, settings) of the signed-in Clerk user. */
   user: User | null;
   loading: boolean;
-  googleAvailable: boolean;
+  enabled: boolean;
   refresh: () => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, displayName: string) => Promise<void>;
-  logout: () => Promise<void>;
   setUser: (user: User | null) => void;
+  /** Called by the Clerk bridge whenever the signed-in Clerk user changes. */
+  setClerkUserId: (id: string | null) => void;
 };
 
 const AuthContext = createContext<AuthCtx | null>(null);
@@ -33,8 +34,8 @@ const SYNCED: (keyof Settings)[] = ["theme", "teamAccent", "favouriteDriver", "f
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [googleAvailable, setGoogleAvailable] = useState(false);
+  const [clerkUserId, setClerkUserId] = useState<string | null | undefined>(clerkEnabled ? undefined : null);
+  const [loading, setLoading] = useState(clerkEnabled);
   const { settings, update, ready } = useSettings();
   const syncedFor = useRef<string | null>(null);
 
@@ -49,15 +50,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Load the app profile whenever the Clerk user changes.
   useEffect(() => {
+    if (clerkUserId === undefined) return;
     const id = setTimeout(() => {
-      void refresh();
-      api<{ google: boolean }>("/api/auth/providers").then((p) => setGoogleAvailable(p.google), () => {});
+      if (clerkUserId) void refresh();
+      else {
+        setUser(null);
+        setLoading(false);
+        syncedFor.current = null;
+      }
     }, 0);
     return () => clearTimeout(id);
-  }, [refresh]);
+  }, [clerkUserId, refresh]);
 
-  // On sign-in, saved account settings win; a new account adopts this device's settings.
+  // On sign-in, saved account settings win; a new profile adopts this device's settings.
   useEffect(() => {
     if (!user || !ready || syncedFor.current === user.id) return;
     syncedFor.current = user.id;
@@ -79,29 +86,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [settings, user]);
 
   const value = useMemo<AuthCtx>(
-    () => ({
-      user,
-      loading,
-      googleAvailable,
-      refresh,
-      setUser,
-      login: async (email, password) => {
-        const { user } = await api<{ user: User }>("/api/auth/login", { body: { email, password } });
-        syncedFor.current = null;
-        setUser(user);
-      },
-      register: async (email, password, displayName) => {
-        const { user } = await api<{ user: User }>("/api/auth/register", { body: { email, password, displayName } });
-        syncedFor.current = null;
-        setUser(user);
-      },
-      logout: async () => {
-        await api("/api/auth/logout", { body: {} });
-        syncedFor.current = null;
-        setUser(null);
-      },
-    }),
-    [user, loading, googleAvailable, refresh],
+    () => ({ user, loading, enabled: clerkEnabled, refresh, setUser, setClerkUserId }),
+    [user, loading, refresh],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

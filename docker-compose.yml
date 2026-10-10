@@ -8,11 +8,11 @@ services:
       # Local MongoDB by default. For MongoDB Atlas, set MONGODB_URI in .env.
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017}
       MONGODB_DB: ${MONGODB_DB:-f1live}
-      # The address people open in their browser (used for Google sign-in and calendar links).
+      # The address people open in their browser (used in calendar links).
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
-      SESSION_SECRET: ${SESSION_SECRET:-}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # Clerk (sign-in). Without these the app runs with accounts switched off.
+      CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
       # Optional F1 TV token for live car positions.
       F1_AUTH_TOKEN: ${F1_AUTH_TOKEN:-}
     ports:
@@ -30,11 +30,16 @@ services:
     restart: unless-stopped
 
   client:
-    build: ./client
+    build:
+      context: ./client
+      args:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
     container_name: f1-client
     environment:
       # Server-to-server calls go over the internal Docker network.
       SERVER_URL: http://server:4000
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
     ports:
       - "3000:3000"
     depends_on:
@@ -55,7 +60,7 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # Local database for accounts and predictions. Not needed if MONGODB_URI points to
+  # Local database for profiles and predictions. Not needed if MONGODB_URI points to
   # MongoDB Atlas (it then just sits idle).
   mongo:
     image: mongo:7

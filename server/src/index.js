@@ -7,9 +7,9 @@ import { getCircuitMap } from './maps.js';
 import { LiveTimingClient } from './livetiming.js';
 import { connectRedis } from './db/redis.js';
 import { connectMongo, mongoReady } from './db/mongo.js';
-import { authRouter, loadUser, requireJson, requireUser, googleConfigured } from './auth.js';
+import { authMiddleware, authRouter, clerkConfigured, loadUser, requireJson, requireUser } from './auth.js';
 import { profileRouter } from './profile.js';
-import { gameRouter, startSettlementJob } from './game.js';
+import { gameRouter, startScoringJob } from './game.js';
 import { calendarRouter } from './calendar.js';
 
 const PORT = Number(process.env.PORT) || 4000;
@@ -45,13 +45,13 @@ app.get('/api/health', (_req, res) => {
     time: new Date().toISOString(),
     live: live.info(),
     accounts: mongoReady(),
-    google: googleConfigured(),
+    clerk: clerkConfigured(),
   });
 });
 
 // --- Accounts, profiles, game, calendar ------------------------------------------------
 
-app.use('/api', loadUser);
+app.use('/api', authMiddleware(), loadUser);
 app.use('/api/auth', authRouter());
 app.use('/api', profileRouter(requireUser));
 app.use('/api/game', gameRouter(requireUser));
@@ -141,21 +141,21 @@ app.get(
   }),
 );
 
-// Errors from the account routes: JSON with the right status. Google sign-in errors
-// redirect back to the login page instead.
+// Errors from the account routes: JSON with the right status.
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, _next) => {
   const upstream = err.message === 'fetch failed' || /^\d{3} from /.test(err.message);
   const status = err.status && !upstream ? err.status : upstream ? 502 : err.type === 'entity.parse.failed' ? 400 : 500;
   if (status >= 500) console.error(`${req.method} ${req.path}:`, err);
-  if (req.path.startsWith('/api/auth/google')) return res.redirect(`/login?error=${encodeURIComponent(err.message)}`);
   const message = upstream ? 'F1 data is temporarily unavailable' : status >= 500 && !err.status ? 'Something went wrong' : err.message;
   res.status(status).json({ error: message });
 });
 
 await connectRedis();
 await connectMongo();
-if (mongoReady()) startSettlementJob();
+if (mongoReady()) startScoringJob();
+// Fetch the world champions list in the background (one request per season).
+setTimeout(() => jolpica.warmChampions(), 5000).unref();
 
 const server = app.listen(PORT, () => {
   console.log(`F1 server listening on http://localhost:${PORT}`);

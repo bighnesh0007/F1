@@ -30,7 +30,10 @@ export function ApiSeed({ data, children }: { data: Record<string, unknown>; chi
   return createElement(SeedContext.Provider, { value: { ...parent, ...data } }, children);
 }
 
-export function useApi<T>(path: string | null, { refreshMs }: { refreshMs?: number } = {}) {
+export function useApi<T>(
+  path: string | null,
+  { refreshMs, refreshWhile }: { refreshMs?: number; refreshWhile?: (data: T | null) => boolean } = {},
+) {
   const seed = useContext(SeedContext);
   const seeded = path != null && seed[path] != null ? (seed[path] as T) : null;
   const [state, setState] = useState<{ path: string | null; data: T | null; error: string | null }>(() => {
@@ -53,15 +56,21 @@ export function useApi<T>(path: string | null, { refreshMs }: { refreshMs?: numb
     const hit = cache.get(path);
     if (!hit || Date.now() - hit.at > 30_000) run();
     else setTimeout(() => !cancelled && setState({ path, data: hit.data as T, error: null }), 0);
-    const timer = refreshMs ? setInterval(() => {
-      cache.delete(path);
-      run();
-    }, refreshMs) : null;
+    // Refresh on an interval; with refreshWhile, only while it returns true for the latest data.
+    const timer = refreshMs
+      ? setInterval(() => {
+          if (refreshWhile && !refreshWhile((cache.get(path)?.data as T) ?? null)) return;
+          cache.delete(path);
+          run();
+        }, refreshMs)
+      : null;
     return () => {
       cancelled = true;
       if (timer) clearInterval(timer);
       if (retry) clearTimeout(retry);
     };
+    // refreshWhile should be a pure check on the data; a new function each render needn't restart the timer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, refreshMs]);
 
   const current = state.path === path ? state : { data: null, error: null };

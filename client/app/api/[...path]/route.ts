@@ -1,10 +1,14 @@
-// Forwards /api/* to the Node.js server, so the browser only talks to this origin
-// (cookies stay first-party) and SERVER_URL can be set at runtime
-// (e.g. http://server:4000 inside Docker).
+import { auth } from "@clerk/nextjs/server";
+import { clerkEnabled } from "@/lib/clerk";
+
+// Forwards /api/* to the Node.js server, so the browser only talks to this origin and
+// SERVER_URL can be set at runtime (e.g. http://server:4000 inside Docker). The
+// signed-in user's Clerk session token is passed on for the server to verify.
 const serverUrl = () => process.env.SERVER_URL || "http://localhost:4000";
 
-// Hop-by-hop and length headers are recomputed by the runtime.
-const SKIP_REQUEST = new Set(["host", "connection", "content-length", "accept-encoding"]);
+// Hop-by-hop and length headers are recomputed by the runtime. Browser cookies and
+// auth headers are not passed on: the server only trusts the token added below.
+const SKIP_REQUEST = new Set(["host", "connection", "content-length", "accept-encoding", "cookie", "authorization"]);
 const PASS_RESPONSE = ["content-type", "cache-control", "location", "content-disposition", "etag", "last-modified"];
 
 async function forward(request: Request, ctx: RouteContext<"/api/[...path]">) {
@@ -16,6 +20,10 @@ async function forward(request: Request, ctx: RouteContext<"/api/[...path]">) {
   });
   const forwardedFor = request.headers.get("x-forwarded-for");
   if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
+  if (clerkEnabled) {
+    const token = await (await auth()).getToken().catch(() => null);
+    if (token) headers.set("authorization", `Bearer ${token}`);
+  }
 
   try {
     const upstream = await fetch(`${serverUrl()}/api/${path.join("/")}${search}`, {
@@ -31,7 +39,6 @@ async function forward(request: Request, ctx: RouteContext<"/api/[...path]">) {
       const value = upstream.headers.get(name);
       if (value) out.set(name, value);
     }
-    for (const cookie of upstream.headers.getSetCookie()) out.append("set-cookie", cookie);
     if (out.get("content-type")?.startsWith("text/event-stream")) {
       out.set("cache-control", "no-cache, no-transform");
       out.set("x-accel-buffering", "no");

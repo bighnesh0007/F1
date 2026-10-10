@@ -30,7 +30,8 @@ export function StatsView() {
 }
 
 function RecordsView() {
-  const { data, error } = useApi<Records>("/api/records");
+  // World champions are fetched season by season on the server; poll until done.
+  const { data, error } = useApi<Records>("/api/records", { refreshMs: 6000, refreshWhile: (d) => d != null && !d.championsComplete });
   if (error && !data) return <ErrorNote message={error} />;
   if (!data) {
     return (
@@ -42,7 +43,12 @@ function RecordsView() {
   }
   const lists = [
     { title: "Most race wins", icon: <Flag size={15} />, items: data.wins, note: `${data.totalRaces} races` },
-    { title: "Most world titles", icon: <Crown size={15} />, items: data.championships, note: `${data.champions.length} seasons` },
+    {
+      title: "Most world titles",
+      icon: <Crown size={15} />,
+      items: data.championships,
+      note: data.championsComplete ? `${data.champions.length} seasons` : `loading… ${data.champions.length} seasons so far`,
+    },
     { title: "Most pole positions", icon: <Medal size={15} />, items: data.poles, note: data.polesSince ? `since ${data.polesSince}` : "" },
     { title: "Most fastest laps", icon: <Timer size={15} />, items: data.fastestLaps, note: data.fastestLapsSince ? `since ${data.fastestLapsSince}` : "" },
   ];

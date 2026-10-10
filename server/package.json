@@ -8,10 +8,11 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "start": "node --env-file-if-exists=../.env src/index.js",
+    "dev": "node --env-file-if-exists=../.env --watch src/index.js"
   },
   "dependencies": {
+    "@clerk/express": "^2.1.78",
     "@microsoft/signalr": "^10.0.11",
     "compression": "^1.8.2",
     "cors": "^2.8.5",

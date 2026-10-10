@@ -269,33 +269,67 @@ export function getCircuitHistory(circuitId) {
   });
 }
 
+// World champions. Jolpica only serves standings one season at a time, so each
+// season is fetched once and cached for a month (past seasons never change).
+const champions = new Map();
+let warming = null;
+
+async function championOf(year) {
+  return cached(`champion:${year}`, 30 * DAY, async () => {
+    const data = await request(`${year}/driverStandings/1.json`);
+    const s = data.MRData.StandingsTable.StandingsLists[0]?.DriverStandings?.[0];
+    if (!s) return null;
+    return { season: year, driver: driver(s.Driver), team: s.Constructors.at(-1)?.name, points: Number(s.points) };
+  });
+}
+
+// Fills in every finished season (newest first). Runs in the background.
+export function warmChampions() {
+  warming ??= (async () => {
+    const last = new Date().getUTCFullYear() - 1;
+    for (let year = last; year >= 1950; year--) {
+      if (champions.has(year)) continue;
+      try {
+        const c = await championOf(year);
+        if (c) champions.set(year, c);
+      } catch (err) {
+        console.error(`Champion ${year}:`, err.message);
+      }
+    }
+  })().finally(() => {
+    warming = null;
+  });
+  return warming;
+}
+
+const finishedSeasons = () => new Date().getUTCFullYear() - 1950;
+
 // All-time records: most wins, poles, fastest laps and championships.
-export function getRecords() {
-  return cached('records', DAY, async () => {
-    const [wins, poles, fastest, champions] = await Promise.all([
+export async function getRecords() {
+  const base = await cached('records', DAY, async () => {
+    const [wins, poles, fastest] = await Promise.all([
       races('results/1.json', 'Results'),
       races('qualifying/1.json', 'QualifyingResults'),
       races('fastest/1/results.json', 'Results'),
-      allPages('driverStandings/1.json'),
     ]);
     const flat = (list, key) => list.flatMap((r) => r[key].map((x) => ({ ...x, season: r.season })));
-    const championList = champions.flatMap((p) => p.StandingsTable.StandingsLists).map((s) => ({
-      season: Number(s.season),
-      driver: driver(s.DriverStandings[0].Driver),
-      team: s.DriverStandings[0].Constructors.at(-1)?.name,
-      points: Number(s.DriverStandings[0].points),
-    }));
     return {
       wins: countBy(flat(wins, 'Results'), (r) => r.Driver.driverId, (r) => driver(r.Driver)).slice(0, 10),
       poles: countBy(flat(poles, 'QualifyingResults'), (r) => r.Driver.driverId, (r) => driver(r.Driver)).slice(0, 10),
       fastestLaps: countBy(flat(fastest, 'Results'), (r) => r.Driver.driverId, (r) => driver(r.Driver)).slice(0, 10),
-      championships: countBy(championList, (c) => c.driver.id, (c) => c.driver).slice(0, 10),
-      champions: championList.sort((a, b) => b.season - a.season),
       totalRaces: wins.length,
       polesSince: poles.length ? Math.min(...poles.map((r) => Number(r.season))) : null,
       fastestLapsSince: fastest.length ? Math.min(...fastest.map((r) => Number(r.season))) : null,
     };
   });
+  if (champions.size < finishedSeasons()) void warmChampions();
+  const championList = [...champions.values()].sort((a, b) => b.season - a.season);
+  return {
+    ...base,
+    championships: countBy(championList, (c) => c.driver.id, (c) => c.driver).slice(0, 10),
+    champions: championList,
+    championsComplete: champions.size >= finishedSeasons(),
+  };
 }
 
 // A season at a glance, for comparing seasons and eras.

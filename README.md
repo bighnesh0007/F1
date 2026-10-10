@@ -12,7 +12,9 @@ docker compose up --build
 
 Open http://localhost:3000. Stop with `Ctrl+C`, or `docker compose down`.
 
-This starts four containers: the web app, the API server, **Redis** (cache, sessions, live session state) and **MongoDB** (accounts, profiles, predictions). Data is kept in Docker volumes between restarts. To use **MongoDB Atlas** instead of the local database, copy `.env.example` to `.env` and set `MONGODB_URI`.
+This starts four containers: the web app, the API server, **Redis** (cache, sessions, live session state) and **MongoDB** (profiles, predictions, rankings). Data is kept in Docker volumes between restarts.
+
+All configuration lives in one file: copy `.env.example` to `.env` in the project root and fill in what you need (Clerk keys for sign-in, `MONGODB_URI` for **MongoDB Atlas**). `.env` is git-ignored, so your secrets never get committed. Docker Compose, the server (`npm run dev`) and the web app all read it.
 
 ## What's inside
 
@@ -37,9 +39,9 @@ This starts four containers: the web app, the API server, **Redis** (cache, sess
 
 **Replay**: play back any finished session since 2018 with moving cars, running order, flags and race control messages.
 
-**Profiles**: sign up with email or Google, pick your team tribe (Tifosi, Papaya Army, Silver Arrows…) or let the "which team are you?" quiz decide, set your favourite driver, earn badges, and share a public profile page. Your settings follow you to any device.
+**Profiles**: sign up with [Clerk](https://clerk.com) (email, Google and any other provider you turn on), pick your team tribe (Tifosi, Papaya Army, Silver Arrows…) or let the "which team are you?" quiz decide, set your favourite driver, earn badges, and share a public profile page. Your settings follow you to any device.
 
-**Predict & play**: call each race weekend (winner, podium, pole, fastest lap, sprint, retirements, teammate battles) with **Pit Coins**. Everyone starts with 1,000, there's a daily bonus with streaks, odds are fixed when you predict, and predictions settle automatically from the official results. Global leaderboard plus private leagues with invite codes. Pit Coins are just for fun: they can't be bought, sold or cashed out.
+**Predict & play**: call each race weekend (winner, podium, pole, fastest lap, sprint, retirements, teammate battles) for **points**. Tap an option to make or change your call until the session starts; long shots are worth more (a back-marker win pays far more than the favourite). Calls are scored automatically from the official results. Rankings: everyone, **tribe vs tribe** (which fan base calls races best), and private leagues with invite codes.
 
 **Calendar**: add a weekend or the whole season to Google Calendar in one tap, open any race in Google Calendar without an account, download an .ics for Apple/Outlook, or subscribe to a season feed that updates itself. **Watch parties** create a Google Calendar event with your friends invited and a Google Meet link.
 
@@ -77,33 +79,41 @@ Since mid-2025, F1 only publishes live car positions to F1 TV subscribers.
 
 The token expires after a few days. It is tied to your personal account: keep it private and do not run a public site with it.
 
-## Accounts, Google sign-in and Google Calendar
+## Sign-in with Clerk
 
-Email + password accounts work out of the box. Google sign-in (and with it Google Calendar sync and watch parties) needs a Google OAuth client:
+Accounts use [Clerk](https://clerk.com). Without keys the app still runs; sign-in, profiles and predictions are just switched off.
 
-1. In [Google Cloud Console](https://console.cloud.google.com/), create a project and enable the **Google Calendar API**.
-2. Configure the OAuth consent screen (External; add yourself as a test user while testing).
-3. Create credentials → **OAuth client ID** → *Web application*, with the authorised redirect URI `http://localhost:3000/api/auth/google/callback` (use your real address in production, matching `PUBLIC_URL`).
-4. Put `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_URL` and a random `SESSION_SECRET` (`openssl rand -base64 32`) in `.env`, then `docker compose up --build`.
+1. In the [Clerk dashboard](https://dashboard.clerk.com), open your application → **API keys**.
+2. Put the two keys in `.env` in the project root:
+   ```
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+   CLERK_SECRET_KEY=sk_test_...
+   ```
+   The publishable key is public (it is built into the browser code). The secret key stays on the server: never commit it or put it in client code.
+3. `docker compose up --build` (the publishable key is baked in at build time, so rebuild after changing it), then open http://localhost:3000 and sign up. The first account you create is your test user.
 
-Google refresh tokens are stored encrypted (AES-256-GCM). Passwords are hashed with scrypt. Sessions are random tokens in an httpOnly cookie, stored in Redis.
+The web app forwards each request with the signed-in user's Clerk session token; the API server verifies it and keeps an app profile (tribe, points, predictions, settings) per Clerk user in MongoDB. Deleting your account in the app deletes both the Clerk user and the app data.
+
+### Google Calendar and watch parties
+
+These use the Google account people sign in with through Clerk:
+
+1. In Clerk → **SSO connections**, enable **Google** and switch to **custom credentials** (a client ID and secret from [Google Cloud Console](https://console.cloud.google.com/) with the **Google Calendar API** enabled; use the redirect URI Clerk shows you).
+2. Add the scope `https://www.googleapis.com/auth/calendar.events`.
+
+People who signed in another way can connect Google from their profile or the calendar menu. The server asks Clerk for a fresh Google access token whenever it writes to the calendar; it never stores Google tokens itself.
 
 ## Data storage
 
 | Store | What | Why |
 | --- | --- | --- |
-| MongoDB (local container or Atlas) | Users, profiles, settings, predictions, the coin ledger, leagues | Flexible documents, easy to host on Atlas |
-| Redis (container) | Cached F1 data (schedule, results, replays, maps), login sessions, the live session's lap history and race feed | Fast, survives server restarts, shared if you run several servers |
+| Clerk | Sign-in, passwords, social logins, sessions | Secure, managed accounts |
+| MongoDB (local container or Atlas) | App profiles, settings, predictions, points, leagues | Flexible documents, easy to host on Atlas |
+| Redis (container) | Cached F1 data (schedule, results, replays, maps), the live session's lap history and race feed | Fast, survives server restarts, shared if you run several servers |
 
-Every coin movement is an entry in an append-only ledger with a unique reference, so settlement can't pay twice. That ledger is also the starting point for a future on-chain token (see below).
+## Roadmap: Web3
 
-## Roadmap: an F1 fan token
-
-Pit Coins are deliberately off-chain and have no monetary value for now. If you take them on-chain later:
-
-- **Token**: an ERC-20 on a low-fee network (e.g. Base or Polygon). Each ledger entry (welcome bonus, daily bonus, payouts) maps to a mint or transfer; users link a wallet to their profile.
-- **Custody**: start custodial (the server holds balances and settles) and let users withdraw to their own wallet, rather than requiring a wallet to play.
-- **Legal**: once coins can be bought or cashed out, predicting with them is real-money betting in most countries, which needs a gambling licence, age and identity checks, and may make the token a regulated asset. Keeping coins earn-only and non-redeemable, or using them for perks (badges, profile themes, league entry), avoids that. Get legal advice before launching anything with real value. F1 and team names are trademarks: an official-looking token would need licensing.
+Points are off-chain and have no monetary value. A future version could add a Web3 layer: Clerk already supports wallet sign-in (MetaMask, Coinbase Wallet, …), which would be the first step for linking a wallet to a profile; on-chain badges or a fan token could follow. Anything that can be bought or cashed out turns predictions into real-money betting in most countries, which needs a gambling licence and legal advice, and F1 and team names are trademarks.
 
 ## Project structure
 
@@ -119,9 +129,9 @@ server/   Node.js + Express                                 → http://localhost
   src/jolpica.js      schedule, results, standings, history (rate-limited, cached)
   src/f1static.js     F1 archive: season index, driver list, replays
   src/maps.js         circuit maps
-  src/auth.js         accounts, sessions, Google sign-in
+  src/auth.js         Clerk token checks, app profiles
   src/profile.js      profiles, settings sync, public profiles
-  src/game.js         Pit Coins, predictions, settlement, leaderboards, leagues
+  src/game.js         predictions, scoring, rankings, tribes, leagues
   src/calendar.js     season .ics feed, Google Calendar sync, watch parties
   src/db/             Redis and MongoDB connections
 docker-compose.yml
@@ -137,7 +147,7 @@ cd server && npm install && npm run dev
 cd client && npm install && npm run dev
 ```
 
-The client reads `SERVER_URL` (default `http://localhost:4000`) to reach the server. For accounts, start Redis and MongoDB (`docker run -d -p 6379:6379 redis:7-alpine` and `docker run -d -p 27017:27017 mongo:7`) and run the server with `REDIS_URL=redis://localhost:6379 MONGODB_URI=mongodb://localhost:27017 npm run dev`. Without them the server still runs; accounts and predictions are just switched off.
+Both read the root `.env`. The client reads `SERVER_URL` (default `http://localhost:4000`) to reach the server. For accounts, set the Clerk keys and either `MONGODB_URI` (Atlas) or start MongoDB locally (`docker run -d -p 27017:27017 mongo:7`, then `MONGODB_URI=mongodb://localhost:27017`); Redis is optional (`REDIS_URL=redis://localhost:6379`). Without them the server still runs; accounts and predictions are just switched off.
 
 ## Server API
 
@@ -158,13 +168,11 @@ The client reads `SERVER_URL` (default `http://localhost:4000`) to reach the ser
 | `GET /api/drivers` | Current drivers: photos, team colours |
 | `GET /api/replay/sessions?year=` | Finished sessions with archived data |
 | `GET /api/replay?path=` | Replay data for one session |
-| `POST /api/auth/register`, `/login`, `/logout`; `GET /api/auth/me` | Email accounts and sessions |
-| `GET /api/auth/google` | Google sign-in (`?calendar=1` also asks for Calendar access) |
+| `GET /api/auth/me`, `POST /api/auth/refresh` | The signed-in user's app profile (re-synced from Clerk) |
 | `GET/PATCH/DELETE /api/profile`, `PUT /api/profile/settings` | Your profile and synced settings |
 | `GET /api/users/:handle` | Public profile |
-| `GET /api/game/markets/:season/:round` | Predictions and odds for a race weekend |
-| `POST /api/game/bets`, `GET /api/game/bets` | Make and list predictions |
-| `POST /api/game/daily` | Daily coin bonus |
-| `GET /api/game/leaderboard`, `/api/game/leagues…` | Leaderboards and leagues |
+| `GET /api/game/markets/:season/:round` | What you can call for a race weekend, with points per option |
+| `PUT/DELETE/GET /api/game/predictions` | Make, change, remove and list your calls |
+| `GET /api/game/leaderboard`, `/api/game/tribes`, `/api/game/leagues…` | Rankings: everyone, tribes, leagues |
 | `GET /api/calendar/feed.ics?season=` | Season calendar feed |
 | `POST /api/calendar/google/sync`, `/google/watch-party` | Google Calendar sync and watch parties |

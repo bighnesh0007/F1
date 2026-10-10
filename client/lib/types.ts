@@ -101,6 +101,7 @@ export type Records = {
   fastestLaps: (JDriver & { count: number })[];
   championships: (JDriver & { count: number })[];
   champions: { season: number; driver: JDriver; team: string; points: number }[];
+  championsComplete: boolean;
   totalRaces: number;
   polesSince: number | null;
   fastestLapsSince: number | null;

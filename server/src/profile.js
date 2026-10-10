@@ -2,9 +2,8 @@
 // user across devices, badges and public profile pages.
 import express from 'express';
 import { mongo } from './db/mongo.js';
-import { kv } from './db/redis.js';
 import { badgesFor } from './game.js';
-import { HttpError, selfView } from './auth.js';
+import { HttpError, deleteClerkUser, selfView } from './auth.js';
 
 export const TEAMS = ['red_bull', 'ferrari', 'mercedes', 'mclaren', 'aston_martin', 'alpine', 'williams', 'racing_bulls', 'haas', 'audi', 'cadillac'];
 
@@ -50,15 +49,14 @@ export function profileRouter(requireUser) {
   });
 
   router.delete('/profile', requireUser, async (req, res) => {
+    // Deletes the Clerk account (sign-in, email, connected accounts) and all app data.
     const id = req.user._id;
+    await deleteClerkUser(req.user);
     await Promise.all([
       mongo().collection('users').deleteOne({ _id: id }),
-      mongo().collection('bets').deleteMany({ userId: id }),
-      mongo().collection('ledger').deleteMany({ userId: id }),
+      mongo().collection('predictions').deleteMany({ userId: id }),
       mongo().collection('leagues').updateMany({ members: id }, { $pull: { members: id } }),
     ]);
-    if (req.sessionToken) await kv.del(`session:${req.sessionToken}`);
-    res.clearCookie('f1live_session', { path: '/' });
     res.json({ ok: true });
   });
 
@@ -71,8 +69,8 @@ export function profileRouter(requireUser) {
       displayName: user.displayName,
       avatarUrl: user.avatarUrl ?? null,
       profile: { team: user.profile?.team ?? null, driverName: user.profile?.driverName ?? null, country: user.profile?.country ?? null, fanSince: user.profile?.fanSince ?? null, bio: user.profile?.bio ?? null, quizResult: user.profile?.quizResult ?? null },
-      stats: { bets: user.stats?.bets ?? 0, won: user.stats?.won ?? 0, profit: (user.stats?.returned ?? 0) - (user.stats?.staked ?? 0) },
-      coins: user.coins ?? 0,
+      stats: { picks: user.stats?.picks ?? 0, correct: user.stats?.correct ?? 0 },
+      points: user.points ?? 0,
       joined: user.createdAt,
       badges: badgesFor(user, { inLeague }).filter((b) => b.earned),
     });

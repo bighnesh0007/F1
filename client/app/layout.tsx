@@ -4,7 +4,9 @@ import "@fontsource/titillium-web/400.css";
 import "@fontsource/titillium-web/600.css";
 import "@fontsource/titillium-web/700.css";
 import "./globals.css";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "./providers";
+import { clerkEnabled } from "@/lib/clerk";
 
 export const metadata: Metadata = {
   title: { default: "F1 Live", template: "%s · F1 Live" },
@@ -33,7 +35,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
       </head>
       <body>
-        <Providers>{children}</Providers>
+        {clerkEnabled ? (
+          <ClerkProvider
+            signInUrl="/sign-in"
+            signUpUrl="/sign-up"
+            appearance={{ variables: { colorPrimary: "#e10600", borderRadius: "0.75rem", fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif" } }}
+          >
+            <Providers>{children}</Providers>
+          </ClerkProvider>
+        ) : (
+          <Providers>{children}</Providers>
+        )}
       </body>
     </html>
   );
