@@ -1,6 +1,7 @@
 "use client";
 
-import { CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 import type { ScheduleSession } from "@/lib/types";
 import { localDay, localTime } from "@/lib/format";
 import { useNow } from "@/lib/useNow";
@@ -32,7 +33,12 @@ export function SessionList({ sessions }: { sessions: ScheduleSession[] }) {
               <p className={cn("tnum font-display text-lg leading-tight font-bold", live && "text-accent-ink")}>{now != null ? localTime(s.start) : " "}</p>
             </div>
             <p className="flex-1 font-medium">{s.name}</p>
-            {live && <span className="flex items-center gap-1.5 text-xs font-bold"><span className="live-dot h-1.5 w-1.5 rounded-full bg-accent-ink" />LIVE</span>}
+            {live && (
+              <Link href="/live" className="flex items-center gap-1.5 rounded-lg bg-accent-ink/15 px-2 py-1 text-xs font-bold hover:bg-accent-ink/25">
+                <span className="live-dot h-1.5 w-1.5 rounded-full bg-accent-ink" />
+                LIVE · Watch <ArrowRight size={13} />
+              </Link>
+            )}
             {next && <span className="text-xs font-semibold text-accent">Up next</span>}
             {done && <CheckCircle2 size={16} className="text-faint" />}
           </li>

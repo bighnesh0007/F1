@@ -10,11 +10,23 @@ import { estimateFraction, type Track } from "@/lib/track";
 import type { CarProgress } from "@/lib/live";
 import type { CircuitMap } from "@/lib/types";
 import { CarDot, CircuitMapView } from "@/components/track/CircuitMapView";
-import { Card, Empty, Skeleton } from "@/components/ui";
+import { Card, Empty, Skeleton, cn } from "@/components/ui";
 
 const SLOW_TRACK_STATUSES = new Set(["4", "6", "7"]);
 
-export function LiveTrackMap({ onSelect }: { onSelect: (number: string) => void }) {
+export function LiveTrackMap({
+  onSelect,
+  focus = null,
+  mapClassName = "aspect-[4/3]",
+  overlay,
+}: {
+  onSelect: (number: string) => void;
+  /** A driver to highlight, on top of the favourite. */
+  focus?: string | null;
+  mapClassName?: string;
+  /** Drawn over the bottom of the map (e.g. the latest race control message). */
+  overlay?: React.ReactNode;
+}) {
   const { topics, trace, connection } = useLive();
   const info = topics.SessionInfo;
   const key = info?.Meeting?.Circuit?.Key;
@@ -54,22 +66,25 @@ export function LiveTrackMap({ onSelect }: { onSelect: (number: string) => void 
     <Card title="Track" icon={<MapPin size={15} />} right={badge} bodyClassName="px-2 pb-2">
       {!displayMap ? (
         loading ? (
-          <Skeleton className="mx-2 mb-2 aspect-[4/3]" />
+          <Skeleton className={cn("mx-2 mb-2", mapClassName)} />
         ) : (
           <Empty title="Track map unavailable">
             {connection?.authenticated ? "Waiting for car positions…" : "The circuit layout couldn't be loaded."}
           </Empty>
         )
       ) : (
-        <CircuitMapView map={displayMap} className="aspect-[4/3] w-full" showCorners={!realMode || displayMap.source === "multiviewer"}>
-          {(track) => (realMode ? <RealCars track={track} entries={entries} onSelect={onSelect} /> : <EstimatedCars track={track} onSelect={onSelect} />)}
-        </CircuitMapView>
+        <div className="relative">
+          <CircuitMapView map={displayMap} className={cn("w-full", mapClassName)} showCorners={!realMode || displayMap.source === "multiviewer"}>
+            {(track) => (realMode ? <RealCars track={track} entries={entries} onSelect={onSelect} focus={focus} /> : <EstimatedCars track={track} onSelect={onSelect} focus={focus} />)}
+          </CircuitMapView>
+          {overlay}
+        </div>
       )}
     </Card>
   );
 }
 
-function RealCars({ track, entries, onSelect }: { track: Track; entries: Record<string, { X: number; Y: number; Status?: string }>; onSelect: (n: string) => void }) {
+function RealCars({ track, entries, onSelect, focus }: { track: Track; entries: Record<string, { X: number; Y: number; Status?: string }>; onSelect: (n: string) => void; focus: string | null }) {
   const { get } = useDrivers();
   const { settings } = useSettings();
   const { topics } = useLive();
@@ -80,7 +95,7 @@ function RealCars({ track, entries, onSelect }: { track: Track; entries: Record<
       const d = get(n);
       const s = track.toScreen(p.X, p.Y);
       const dim = Boolean(lines[n]?.InPit) || p.Status === "OffTrack";
-      const highlight = settings.favouriteDriver === n;
+      const highlight = settings.favouriteDriver === n || focus === n;
       // Parked cars bunch up in the pit lane; drop their labels to keep the map readable.
       return { number: n, tla: d.tla, colour: d.colour, x: s.x, y: s.y, dim, highlight, hideLabel: dim && !highlight };
     })
@@ -95,7 +110,7 @@ function RealCars({ track, entries, onSelect }: { track: Track; entries: Record<
 }
 
 // Cars placed by estimated lap progress, animated every frame.
-function EstimatedCars({ track, onSelect }: { track: Track; onSelect: (n: string) => void }) {
+function EstimatedCars({ track, onSelect, focus }: { track: Track; onSelect: (n: string) => void; focus: string | null }) {
   const { topics, feedNow } = useLive();
   const { get } = useDrivers();
   const { settings } = useSettings();
@@ -128,9 +143,10 @@ function EstimatedCars({ track, onSelect }: { track: Track; onSelect: (n: string
     return () => cancelAnimationFrame(frame);
   }, [track, feedNow]);
 
+  const hi = (n: string) => settings.favouriteDriver === n || focus === n;
   const numbers = Object.keys(progress ?? {})
     .filter((n) => progress?.[n]?.p != null && !progress?.[n]?.out && !lines[n]?.Retired)
-    .sort((a, b) => Number(settings.favouriteDriver === a) - Number(settings.favouriteDriver === b));
+    .sort((a, b) => Number(hi(a)) - Number(hi(b)));
 
   return (
     <g>
@@ -146,7 +162,7 @@ function EstimatedCars({ track, onSelect }: { track: Track; onSelect: (n: string
             }}
           >
             <CarDot
-              car={{ number: n, tla: d.tla, colour: d.colour, x: 0, y: 0, dim: pit, highlight: settings.favouriteDriver === n, hideLabel: pit && settings.favouriteDriver !== n }}
+              car={{ number: n, tla: d.tla, colour: d.colour, x: 0, y: 0, dim: pit, highlight: hi(n), hideLabel: pit && !hi(n) }}
               size={track.size}
               onClick={() => onSelect(n)}
             />

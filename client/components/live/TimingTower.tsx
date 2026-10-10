@@ -101,8 +101,8 @@ export function TimingTower({ onSelect }: { onSelect: (number: string) => void }
               >
                 <span className="tnum text-center font-display text-base font-bold">{row.position < 99 ? row.position : "–"}</span>
                 <span className="flex min-w-0 items-center gap-2">
-                  <TeamBar colour={d.colour} className="h-5" />
-                  <span className="font-display text-[15px] font-bold tracking-wide">{d.tla}</span>
+                  <TeamBar colour={d.colour} className="h-5 shrink-0" />
+                  <span className="shrink-0 font-display text-[15px] font-bold tracking-wide">{d.tla}</span>
                   {favourite && <Star size={12} className="shrink-0 fill-current text-accent" />}
                   {status && <span className="rounded-md bg-surface-3 px-1.5 py-0.5 text-[10px] font-bold text-muted">{status}</span>}
                   {battle && (

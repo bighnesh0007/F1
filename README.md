@@ -35,6 +35,8 @@ All configuration lives in one file: copy `.env.example` to `.env` in the projec
 
 **Standings**: drivers, teams, a title-fight calculator ("can they still win it?"), a points simulator for the next race, and teammate head-to-heads.
 
+**Race centre** (`/live`): tap the LIVE badge, "Open race centre" or a live session to open a full view of the session: a big track map with every car, the timing tower, race control messages (filter flags, stewards' decisions, DRS) with the latest one shown over the map, a team radio player (tap to listen, or auto-play new radio as it comes in), a driver to follow (position, gaps to the cars around them, sectors and mini-sectors, tyres, and live speed/gear/throttle/brake with an F1 TV token), pit stops with stationary times, and the live championship during races. On phones each part is a tab.
+
 **Stats**: all-time records (wins, titles, poles, fastest laps), every champion, and season-vs-season comparison.
 
 **Replay**: play back any finished session since 2018 with moving cars, running order, flags and race control messages.

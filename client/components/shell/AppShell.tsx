@@ -47,8 +47,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
           <div className="ml-auto flex items-center gap-2">
             {live && (
-              <Link href="/" className="flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-accent-ink md:hidden">
-                <span className="live-dot h-1.5 w-1.5 rounded-full bg-accent-ink" /> LIVE
+              <Link href="/live" title="Open the race centre" className="flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-accent-ink shadow-card hover:opacity-90">
+                <span className="live-dot h-1.5 w-1.5 rounded-full bg-accent-ink" /> LIVE<span className="hidden sm:inline"> · Race centre</span>
               </Link>
             )}
             {clerkEnabled ? (
@@ -99,7 +99,7 @@ function ActiveNavLinks(props: { live: boolean; variant: "top" | "bottom" }) {
 }
 
 function NavLinks({ live, variant, pathname }: { live: boolean; variant: "top" | "bottom"; pathname: string | null }) {
-  const active = (href: string) => pathname != null && (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  const active = (href: string) => pathname != null && (href === "/" ? pathname === "/" || pathname === "/live" : pathname.startsWith(href));
   if (variant === "top") {
     return (
       <>

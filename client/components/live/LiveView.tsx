@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { Maximize2 } from "lucide-react";
 import { useSettings, type LivePanel } from "@/lib/settings";
 import { useApi } from "@/lib/useApi";
 import type { Weekend } from "@/lib/types";
@@ -33,7 +35,13 @@ export function LiveView() {
 
   return (
     <div className="space-y-4">
-      <SessionBar />
+      <SessionBar
+        action={
+          <Link href="/live" className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-bold text-accent-ink shadow-card hover:opacity-90">
+            <Maximize2 size={14} /> Open race centre
+          </Link>
+        }
+      />
       <div className="lg:hidden [&>div]:flex [&>div]:w-full [&_button]:flex-1">
         <Segmented
           value={tab}

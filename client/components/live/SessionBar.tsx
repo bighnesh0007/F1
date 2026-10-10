@@ -14,7 +14,7 @@ const TONES = {
   red: "bg-red-600 text-white",
 };
 
-export function SessionBar() {
+export function SessionBar({ action }: { action?: React.ReactNode }) {
   const { topics, connection, streamOpen } = useLive();
   const info = topics.SessionInfo;
   const track = TRACK_STATUS[String(topics.TrackStatus?.Status)];
@@ -65,6 +65,7 @@ export function SessionBar() {
               )}
             </div>
           )}
+          {action}
         </div>
       </div>
     </div>
