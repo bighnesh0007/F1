@@ -34,6 +34,14 @@ export async function connectMongo() {
     db.collection('leagues').createIndex({ members: 1 }),
     db.collection('pushSubscriptions').createIndex({ endpoint: 1 }, { unique: true }),
     db.collection('pushSubscriptions').createIndex({ 'prefs.driver': 1 }),
+    db.collection('chatMessages').createIndex({ room: 1, createdAt: -1 }),
+    db.collection('chatMessages').createIndex({ createdAt: 1 }, { expireAfterSeconds: 7 * 86400 }),
+    db.collection('pollVotes').createIndex({ pollId: 1, voter: 1 }, { unique: true }),
+    db.collection('fantasyTeams').createIndex({ userId: 1, season: 1, round: 1 }, { unique: true }),
+    db.collection('fantasyTeams').createIndex({ season: 1, status: 1 }),
+    db.collection('quizAttempts').createIndex({ userId: 1, week: 1 }, { unique: true }),
+    db.collection('follows').createIndex({ follower: 1, followee: 1 }, { unique: true }),
+    db.collection('follows').createIndex({ followee: 1 }),
   ]);
   console.log('MongoDB: connected');
   return db;

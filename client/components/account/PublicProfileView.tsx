@@ -1,7 +1,10 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { Trophy } from "lucide-react";
+import { useState } from "react";
+import { Trophy, UserCheck, UserPlus } from "lucide-react";
+import { api, useAuth } from "@/lib/auth";
+import { ShareButton } from "@/components/play/Social";
 import { useApi } from "@/lib/useApi";
 import { readableInk } from "@/lib/settings";
 import { teamById } from "@/lib/teams";
@@ -18,11 +21,34 @@ type PublicProfile = {
   points: number;
   joined: string;
   badges: Badge[];
+  followers: number;
+  following: number;
+  viewerFollows: boolean;
+  isMe: boolean;
+  streak: number;
+  fantasy: number;
 };
 
 export function PublicProfileView() {
   const { handle } = useParams<{ handle: string }>();
-  const { data, error } = useApi<PublicProfile>(`/api/users/${handle}`);
+  const [version, setVersion] = useState(0);
+  const { data, error } = useApi<PublicProfile>(`/api/users/${handle}?v=${version}`, { keepPrevious: true });
+  const { user } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [followError, setFollowError] = useState<string | null>(null);
+  const toggleFollow = async () => {
+    if (!data) return;
+    setBusy(true);
+    setFollowError(null);
+    try {
+      await api(`/api/users/${data.handle}/follow`, { method: data.viewerFollows ? "DELETE" : "POST" });
+      setVersion((v) => v + 1);
+    } catch (err) {
+      setFollowError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
   if (error && !data) return <ErrorNote message={error} />;
   if (!data) return <Skeleton className="h-72 rounded-3xl" />;
   const team = teamById(data.profile.team);
@@ -42,6 +68,25 @@ export function PublicProfileView() {
             </p>
           </div>
           <div className="rounded-2xl bg-surface/90 px-4 py-2.5 shadow-card"><Points value={data.points} className="text-xl" /></div>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/10 bg-surface/90 px-6 py-3 text-sm">
+          <span><b className="tnum">{data.followers}</b> <span className="text-muted">followers</span></span>
+          <span><b className="tnum">{data.following}</b> <span className="text-muted">following</span></span>
+          {data.streak > 0 && <span title="Race weekends in a row with a prediction">🔥 <b>{data.streak}</b> <span className="text-muted">weekend streak</span></span>}
+          {data.fantasy > 0 && <span><b className="tnum">{data.fantasy}</b> <span className="text-muted">fantasy points</span></span>}
+          <span className="ml-auto flex items-center gap-2">
+            <ShareButton url={`/u/${data.handle}`} title={`${data.displayName} on F1 Live`} label="Share profile" />
+            {user && !data.isMe && (
+              <button
+                onClick={toggleFollow}
+                disabled={busy}
+                className={cn("flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-semibold", data.viewerFollows ? "border border-line text-muted hover:text-ink" : "bg-accent text-accent-ink")}
+              >
+                {data.viewerFollows ? <UserCheck size={15} /> : <UserPlus size={15} />} {data.viewerFollows ? "Following" : "Follow"}
+              </button>
+            )}
+          </span>
+          {followError && <p className="w-full text-xs text-bad">{followError}</p>}
         </div>
       </section>
       <div className="grid gap-4 sm:grid-cols-2">

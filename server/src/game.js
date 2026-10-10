@@ -5,9 +5,12 @@
 // private leagues rank groups of friends.
 import crypto from 'node:crypto';
 import express from 'express';
+import { ObjectId } from 'mongodb';
 import { mongo } from './db/mongo.js';
 import { cached, MINUTE } from './http.js';
 import * as jolpica from './jolpica.js';
+import { recordWeekendPlayed } from './streaks.js';
+import { scoreDueFantasy } from './fantasy.js';
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -117,6 +120,7 @@ async function makePick(user, { season, round, market, pick }) {
   const result = await predictions.findOneAndUpdate(filter, { $set: fields, $setOnInsert: { createdAt: new Date() } }, { upsert: true, returnDocument: 'after', includeResultMetadata: true });
   if (!result.lastErrorObject?.updatedExisting) {
     await mongo().collection('users').updateOne({ _id: user._id }, { $inc: { 'stats.picks': 1 } });
+    await recordWeekendPlayed(user, season, round);
   }
   return result.value;
 }
@@ -215,6 +219,8 @@ export function startScoringJob() {
         const n = await scoreRound(_id.season, _id.round);
         if (n) console.log(`Scored ${n} predictions for ${_id.season} round ${_id.round}`);
       }
+      const f = await scoreDueFantasy();
+      if (f) console.log(`Scored ${f} fantasy teams`);
     } catch (err) {
       if (err.status !== 503) console.error('Scoring job:', err.message);
     }
@@ -236,9 +242,17 @@ export const BADGES = {
   centurion: { title: 'Centurion', description: 'Reached 1,000 points' },
   social: { title: 'Paddock club', description: 'Joined a league' },
   organised: { title: 'Organised', description: 'Connected Google Calendar' },
+  onARoll: { title: 'On a roll', description: 'Predicted 3 race weekends in a row' },
+  everPresent: { title: 'Ever-present', description: 'Predicted 10 race weekends in a row' },
+  encyclopedia: { title: 'Encyclopedia', description: 'Perfect score in the weekly quiz' },
+  quizRegular: { title: 'Quizmaster', description: 'Played 5 weekly quizzes' },
+  principal: { title: 'Team principal', description: 'Scored with a fantasy team' },
+  regular: { title: 'Regular', description: 'Watched 10 live sessions in the race centre' },
+  host: { title: 'Host', description: 'Organised a watch party' },
+  friendly: { title: 'Friendly', description: 'Following 5 fans' },
 };
 
-export function badgesFor(user, { inLeague = false } = {}) {
+export function badgesFor(user, { inLeague = false, following = 0 } = {}) {
   const s = user.stats ?? {};
   const earned = {
     rookie: true,
@@ -251,6 +265,14 @@ export function badgesFor(user, { inLeague = false } = {}) {
     centurion: (user.points ?? 0) >= 1000,
     social: inLeague,
     organised: Boolean(user.google?.calendar),
+    onARoll: (s.streak?.best ?? 0) >= 3,
+    everPresent: (s.streak?.best ?? 0) >= 10,
+    encyclopedia: (s.quizPerfect ?? 0) > 0,
+    quizRegular: (s.quizWeeks ?? 0) >= 5,
+    principal: (s.fantasyRounds ?? 0) > 0,
+    regular: (user.watched?.length ?? 0) >= 10,
+    host: (s.watchParties ?? 0) > 0,
+    friendly: following >= 5,
   };
   return Object.entries(BADGES).map(([id, b]) => ({ id, ...b, earned: earned[id] }));
 }
@@ -265,6 +287,7 @@ export const publicUser = (u) => ({
   points: u.points ?? 0,
   correct: u.stats?.correct ?? 0,
   picks: u.stats?.picks ?? 0,
+  streak: u.stats?.streak?.current ?? 0,
 });
 
 export function gameRouter(requireUser) {
@@ -290,6 +313,15 @@ export function gameRouter(requireUser) {
     if (req.query.season && req.query.round) Object.assign(filter, { season: Number(req.query.season), round: Number(req.query.round) });
     const list = await mongo().collection('predictions').find(filter).sort({ updatedAt: -1 }).limit(200).toArray();
     res.json(list.map(({ userId: _ignored, ...p }) => p));
+  });
+
+  // A correct call, for share cards (public: no picks are revealed before they're scored).
+  router.get('/calls/:id', async (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) throw new HttpError(404, 'Not found');
+    const p = await mongo().collection('predictions').findOne({ _id: new ObjectId(req.params.id), status: 'correct' });
+    if (!p) throw new HttpError(404, 'Not found');
+    const u = await mongo().collection('users').findOne({ _id: p.userId });
+    res.json({ race: p.race, season: p.season, market: p.marketTitle, pick: p.pickLabel, earned: p.earned ?? p.points, user: u ? publicUser(u) : null });
   });
 
   // Rankings of everyone by points.

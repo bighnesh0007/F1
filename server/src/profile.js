@@ -4,6 +4,7 @@ import express from 'express';
 import { mongo } from './db/mongo.js';
 import { badgesFor } from './game.js';
 import { HttpError, deleteClerkUser, selfView } from './auth.js';
+import { followCounts } from './social.js';
 
 export const TEAMS = ['red_bull', 'ferrari', 'mercedes', 'mclaren', 'aston_martin', 'alpine', 'williams', 'racing_bulls', 'haas', 'audi', 'cadillac'];
 
@@ -14,7 +15,8 @@ export function profileRouter(requireUser) {
 
   router.get('/profile', requireUser, async (req, res) => {
     const inLeague = (await mongo().collection('leagues').countDocuments({ members: req.user._id })) > 0;
-    res.json({ user: selfView(req.user), badges: badgesFor(req.user, { inLeague }) });
+    const counts = await followCounts(req.user._id);
+    res.json({ user: { ...selfView(req.user), ...counts }, badges: badgesFor(req.user, { inLeague, following: counts.following }) });
   });
 
   router.patch('/profile', requireUser, async (req, res) => {
@@ -56,6 +58,12 @@ export function profileRouter(requireUser) {
       mongo().collection('users').deleteOne({ _id: id }),
       mongo().collection('predictions').deleteMany({ userId: id }),
       mongo().collection('leagues').updateMany({ members: id }, { $pull: { members: id } }),
+      mongo().collection('fantasyTeams').deleteMany({ userId: id }),
+      mongo().collection('quizAttempts').deleteMany({ userId: id }),
+      mongo().collection('chatMessages').deleteMany({ userId: id }),
+      mongo().collection('follows').deleteMany({ $or: [{ follower: id }, { followee: id }] }),
+      mongo().collection('pollVotes').deleteMany({ voter: `u:${id}` }),
+      mongo().collection('pushSubscriptions').deleteMany({ userId: id }),
     ]);
     res.json({ ok: true });
   });
@@ -64,7 +72,14 @@ export function profileRouter(requireUser) {
     const user = await mongo().collection('users').findOne({ handle: String(req.params.handle).toLowerCase() });
     if (!user) throw new HttpError(404, 'No such fan');
     const inLeague = (await mongo().collection('leagues').countDocuments({ members: user._id })) > 0;
+    const counts = await followCounts(user._id);
+    const viewerFollows = req.user ? Boolean(await mongo().collection('follows').findOne({ follower: req.user._id, followee: user._id })) : false;
     res.json({
+      ...counts,
+      viewerFollows,
+      isMe: req.user ? String(req.user._id) === String(user._id) : false,
+      streak: user.stats?.streak?.current ?? 0,
+      fantasy: user.stats?.fantasy ?? 0,
       handle: user.handle,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl ?? null,
@@ -72,7 +87,7 @@ export function profileRouter(requireUser) {
       stats: { picks: user.stats?.picks ?? 0, correct: user.stats?.correct ?? 0 },
       points: user.points ?? 0,
       joined: user.createdAt,
-      badges: badgesFor(user, { inLeague }).filter((b) => b.earned),
+      badges: badgesFor(user, { inLeague, following: counts.following }).filter((b) => b.earned),
     });
   });
 

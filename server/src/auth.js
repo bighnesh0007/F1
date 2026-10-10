@@ -113,10 +113,13 @@ export function requireUser(req, _res, next) {
 
 // Changes must be JSON requests: browsers can't send those cross-site without CORS
 // approval, which protects cookie-authenticated endpoints from CSRF.
+// Requests without a body (e.g. "follow") have no content type; forms always send one.
 export function requireJson(req, _res, next) {
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && !req.is('application/json')) {
-    return next(new HttpError(415, 'Expected a JSON request'));
-  }
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const type = req.headers['content-type'];
+  const hasBody = Number(req.headers['content-length'] || 0) > 0 || Boolean(req.headers['transfer-encoding']);
+  if (!type && !hasBody) return next();
+  if (!String(type ?? '').toLowerCase().startsWith('application/json')) return next(new HttpError(415, 'Expected a JSON request'));
   next();
 }
 

@@ -139,6 +139,7 @@ export function calendarRouter(requireUser) {
     const { status, json } = await googleRequest(token, `${CALENDAR_API}?conferenceDataVersion=1&sendUpdates=all`, 'POST', event);
     if (status >= 400) throw new HttpError(502, `Google Calendar: ${json.error?.message ?? status}`);
     await mongo().collection('users').updateOne({ _id: req.user._id }, { $inc: { 'stats.watchParties': 1 } });
+    await mongo().collection('users').updateOne({ _id: req.user._id }, { $inc: { 'stats.watchParties': 1 } });
     res.status(201).json({ link: json.htmlLink, meet: json.hangoutLink ?? null, invited: guests.length });
   });
 

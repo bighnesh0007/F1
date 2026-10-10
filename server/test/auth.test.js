@@ -14,8 +14,10 @@ test('requireUser explains when sign-in is not configured or missing', async () 
 });
 
 test('requireJson blocks non-JSON writes', async () => {
-  const req = (method, json) => ({ method, is: () => json });
-  assert.equal((await run(requireJson, req('POST', false))).status, 415);
-  assert.equal(await run(requireJson, req('POST', true)), undefined);
-  assert.equal(await run(requireJson, req('GET', false)), undefined);
+  const req = (method, headers) => ({ method, headers });
+  assert.equal((await run(requireJson, req('POST', { 'content-type': 'application/x-www-form-urlencoded', 'content-length': '5' }))).status, 415);
+  assert.equal((await run(requireJson, req('POST', { 'content-type': 'text/plain' }))).status, 415);
+  assert.equal(await run(requireJson, req('POST', { 'content-type': 'application/json; charset=utf-8', 'content-length': '2' })), undefined);
+  assert.equal(await run(requireJson, req('POST', {})), undefined);
+  assert.equal(await run(requireJson, req('GET', { 'content-type': 'text/plain' })), undefined);
 });

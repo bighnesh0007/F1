@@ -32,7 +32,16 @@ export function ApiSeed({ data, children }: { data: Record<string, unknown>; chi
 
 export function useApi<T>(
   path: string | null,
-  { refreshMs, refreshWhile }: { refreshMs?: number; refreshWhile?: (data: T | null) => boolean } = {},
+  {
+    refreshMs,
+    refreshWhile,
+    keepPrevious,
+  }: {
+    refreshMs?: number;
+    refreshWhile?: (data: T | null) => boolean;
+    /** Keep showing the previous path's data while the new path loads (e.g. after a save). */
+    keepPrevious?: boolean;
+  } = {},
 ) {
   const seed = useContext(SeedContext);
   const seeded = path != null && seed[path] != null ? (seed[path] as T) : null;
@@ -73,6 +82,6 @@ export function useApi<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, refreshMs]);
 
-  const current = state.path === path ? state : { data: null, error: null };
+  const current = state.path === path ? state : { data: keepPrevious ? state.data : null, error: null };
   return { data: current.data, error: current.error, loading: Boolean(path) && !current.data && !current.error };
 }

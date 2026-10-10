@@ -240,7 +240,7 @@ function StatsCard({ user }: { user: User }) {
   const accuracy = s.picks ? Math.round(((s.correct ?? 0) / s.picks) * 100) : 0;
   return (
     <Card
-      title="Prediction stats"
+      title="Your stats"
       icon={<Trophy size={15} />}
       right={
         <Link href="/play" className="text-xs font-semibold text-accent">
@@ -253,6 +253,9 @@ function StatsCard({ user }: { user: User }) {
           ["Calls", String(s.picks ?? 0)],
           ["Correct", `${s.correct ?? 0} (${accuracy}%)`],
           ["Best call", `${s.bestPick ?? 0} pts`],
+          ["Weekend streak", `🔥 ${s.streak?.current ?? 0} (best ${s.streak?.best ?? 0})`],
+          ["Fantasy", `${s.fantasy ?? 0} pts`],
+          ["Quizzes", String(s.quizWeeks ?? 0)],
         ].map(([label, value]) => (
           <div key={label} className="rounded-xl bg-surface-2 px-3 py-2">
             <p className="text-[10px] font-semibold tracking-wider text-faint uppercase">{label}</p>

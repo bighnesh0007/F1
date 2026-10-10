@@ -49,6 +49,14 @@ All configuration lives in one file: copy `.env.example` to `.env` in the projec
 
 **Predict & play**: call each race weekend (winner, podium, pole, fastest lap, sprint, retirements, teammate battles) for **points**. Tap an option to make or change your call until the session starts; long shots are worth more (a back-marker win pays far more than the favourite). Calls are scored automatically from the official results. Rankings: everyone, **tribe vs tribe** (which fan base calls races best), and private leagues with invite codes.
 
+**Fantasy team**: pick 5 drivers and 2 teams within a 100.0 budget before qualifying (prices follow the championship), name a captain who scores double, and score from the real results: championship points, places gained and a penalty for retiring. Teams carry over between weekends.
+
+**Weekly quiz**: five questions from real race history (winners, poles, podiums, teams, fastest laps), the same for everyone that week, for extra points.
+
+**Live chat and polls**: chat during sessions with everyone or just your tribe (sign-in to post, slow mode, report and hide), plus fan polls in races: "Who wins?" until half distance and "Driver of the day" at the end, with live results.
+
+**Friends and achievements**: follow other fans, rank against them, and see their calls once they lock. Badges for streaks (predicting weekends in a row), quizzes, fantasy, watching live sessions, hosting watch parties and more. **Share cards**: share a correct call or your profile as a picture card on social media.
+
 **Calendar**: add a weekend or the whole season to Google Calendar in one tap, open any race in Google Calendar without an account, download an .ics for Apple/Outlook, or subscribe to a season feed that updates itself. **Watch parties** create a Google Calendar event with your friends invited and a Google Meet link.
 
 **Settings**: favourite driver (highlighted everywhere, optional team-colour theme), dark/light theme, spoiler-free mode, alerts, flag effects, sounds, reminders, and which live panels show in what order. Installable as an app on phones and desktops.
@@ -141,7 +149,15 @@ server/   Node.js + Express                                 → http://localhost
   src/maps.js         circuit maps
   src/auth.js         Clerk token checks, app profiles
   src/profile.js      profiles, settings sync, public profiles
-  src/game.js         predictions, scoring, rankings, tribes, leagues
+  src/game.js         predictions, scoring, rankings, tribes, leagues, badges
+  src/fantasy.js      fantasy teams, prices and scoring
+  src/quiz.js         weekly quiz from race history
+  src/chat.js         live chat (SSE, Redis pub/sub)
+  src/polls.js        fan polls during races
+  src/social.js       friends, feed, live-session check-ins
+  src/push.js         push notifications
+  src/transcribe.js   team radio transcripts
+  src/observe.js      request logs, browser error reports, metrics
   src/calendar.js     season .ics feed, Google Calendar sync, watch parties
   src/db/             Redis and MongoDB connections
 docker-compose.yml
@@ -225,4 +241,11 @@ Both read the root `.env`. The client reads `SERVER_URL` (default `http://localh
 | `PUT/DELETE/GET /api/game/predictions` | Make, change, remove and list your calls |
 | `GET /api/game/leaderboard`, `/api/game/tribes`, `/api/game/leagues…` | Rankings: everyone, tribes, leagues |
 | `GET /api/calendar/feed.ics?season=` | Season calendar feed |
+| `GET/PUT /api/game/fantasy/:season/:round`, `GET /api/game/fantasy/leaderboard`, `/history` | Fantasy team, prices, rankings |
+| `GET/POST /api/game/quiz` | This week's quiz, submit answers |
+| `GET /api/game/calls/:id` | A correct call (for share cards) |
+| `GET/POST /api/chat/:room`, `GET /api/chat/:room/stream` | Chat rooms (`everyone`, `tribe-<team>`), live stream |
+| `GET /api/polls/live`, `POST /api/polls/:kind/vote` | Fan polls during races |
+| `POST/DELETE /api/users/:handle/follow`, `GET /api/friends`, `/friends/leaderboard`, `/friends/feed` | Friends |
+| `POST /api/push/subscribe`, `/unsubscribe`, `GET /api/push/key` | Push notifications |
 | `POST /api/calendar/google/sync`, `/google/watch-party` | Google Calendar sync and watch parties |

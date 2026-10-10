@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, Flag, History, Map as MapIcon, Radio, Timer, Trophy, Tv } from "lucide-react";
+import { ArrowLeft, Flag, History, Map as MapIcon, MessageCircle, Radio, Timer, Trophy, Tv } from "lucide-react";
 import { useLive } from "@/lib/live-context";
 import { useSettings } from "@/lib/settings";
 import { useApi } from "@/lib/useApi";
 import { useNow } from "@/lib/useNow";
+import { useMedia } from "@/lib/useMedia";
 import { isRaceSession, list, sessionIsActive } from "@/lib/live";
 import { countryFlag, localDay, localTime } from "@/lib/format";
 import type { Weekend } from "@/lib/types";
@@ -19,6 +20,9 @@ import dynamic from "next/dynamic";
 import { LatestMessageBanner, RaceControlList, useRaceControl } from "./RaceControl";
 import { RadioPlayer } from "./RadioPlayer";
 import { PopOutButton } from "./PopOut";
+import { Chat } from "./Chat";
+import { LivePolls } from "./LivePolls";
+import { useWatchedCheckIn } from "./checkin";
 import { DriverFocus } from "./DriverFocus";
 import { LiveChampionship, PitStops } from "./PitsAndTitle";
 
@@ -26,8 +30,8 @@ import { LiveChampionship, PitStops } from "./PitsAndTitle";
 const Insights = dynamic(() => import("@/components/live/Insights").then((m) => m.Insights));
 const DriverSheet = dynamic(() => import("@/components/live/DriverSheet").then((m) => m.DriverSheet));
 
-type SideTab = "control" | "radio" | "pits" | "title";
-type MobileTab = "track" | "timing" | "driver" | "charts" | "control" | "radio";
+type SideTab = "control" | "radio" | "chat" | "pits" | "title";
+type MobileTab = "track" | "timing" | "driver" | "charts" | "control" | "radio" | "chat";
 
 // A full view of one live session: big map, timing, race control, team radio, a
 // driver to follow, pit stops and the live championship.
@@ -42,6 +46,8 @@ export function RaceCentre() {
   const [mobile, setMobile] = useState<MobileTab>("track");
   const messages = useRaceControl();
   const radioCount = list(topics.TeamRadio?.Captures).length;
+  const wide = useMedia("(min-width: 1280px)");
+  useWatchedCheckIn(sessionIsActive(topics, connection) ? topics.SessionInfo?.Path : null);
 
   if (!connection) return <CentreSkeleton />;
   if (!sessionIsActive(topics, connection)) return <NotLive />;
@@ -58,6 +64,7 @@ export function RaceCentre() {
   const sideTabs = [
     { value: "control" as const, label: `Control${messages.length ? ` ${messages.length}` : ""}` },
     { value: "radio" as const, label: `Radio${radioCount ? ` ${radioCount}` : ""}` },
+    { value: "chat" as const, label: "Chat" },
     { value: "pits" as const, label: "Pits" },
     ...(race ? [{ value: "title" as const, label: "Title" }] : []),
   ];
@@ -65,8 +72,8 @@ export function RaceCentre() {
 
   const sidePanel = (
     <Card
-      title={{ control: "Race control", radio: "Team radio", pits: "Pit stops", title: "Live championship" }[sideTab]}
-      icon={{ control: <Flag size={15} />, radio: <Radio size={15} />, pits: <Timer size={15} />, title: <Trophy size={15} /> }[sideTab]}
+      title={{ control: "Race control", radio: "Team radio", chat: "Chat", pits: "Pit stops", title: "Live championship" }[sideTab]}
+      icon={{ control: <Flag size={15} />, radio: <Radio size={15} />, chat: <MessageCircle size={15} />, pits: <Timer size={15} />, title: <Trophy size={15} /> }[sideTab]}
     >
       <div className="mb-3 max-lg:hidden [&>div]:flex [&>div]:w-full [&_button]:flex-1">
         <Segmented size="sm" value={sideTab} onChange={setSide} options={sideTabs} />
@@ -74,6 +81,7 @@ export function RaceCentre() {
       <div className="scroll-thin -mr-2 max-h-[min(70vh,720px)] overflow-y-auto pr-2">
         {sideTab === "control" && <RaceControlList focus={focus} />}
         {sideTab === "radio" && <RadioPlayer focus={focus} />}
+        {sideTab === "chat" && <Chat />}
         {sideTab === "pits" && <PitStops focus={focus} />}
         {sideTab === "title" && <LiveChampionship />}
       </div>
@@ -96,12 +104,12 @@ export function RaceCentre() {
         }
       />
 
-      <div className="lg:hidden [&>div]:flex [&>div]:w-full [&_button]:flex-1 [&_button]:px-1">
+      <div className="scroll-thin -mx-1 overflow-x-auto px-1 lg:hidden [&>div]:flex [&>div]:min-w-full [&_button]:flex-1 [&_button]:px-2.5 [&_button]:whitespace-nowrap">
         <Segmented
           value={mobile}
           onChange={(t) => {
             setMobile(t);
-            if (t === "control" || t === "radio") setSide(t);
+            if (t === "control" || t === "radio" || t === "chat") setSide(t);
           }}
           options={[
             { value: "track", label: "Track" },
@@ -110,6 +118,7 @@ export function RaceCentre() {
             { value: "charts", label: "Charts" },
             { value: "control", label: "Control" },
             { value: "radio", label: "Radio" },
+            { value: "chat", label: "Chat" },
           ]}
         />
       </div>
@@ -133,17 +142,21 @@ export function RaceCentre() {
               }}
             />
           </div>
+          <div className={show("track")}>
+            <LivePolls />
+          </div>
           <div className={show("charts")}>
             <Insights focus={focus} />
           </div>
-          <div className={cn("xl:hidden", mobile === "control" || mobile === "radio" ? "" : "max-lg:hidden")}>{sidePanel}</div>
+          {/* The side panel is mounted once (chat and radio keep one connection/player). */}
+          {!wide && <div className={cn(mobile === "control" || mobile === "radio" || mobile === "chat" ? "" : "max-lg:hidden")}>{sidePanel}</div>}
           <div className="grid gap-4 max-lg:hidden md:grid-cols-2">
             <BattlesPanel onSelect={select} />
             <WeatherPanel />
           </div>
         </div>
 
-        <div className="hidden space-y-4 xl:sticky xl:top-20 xl:block">{sidePanel}</div>
+        {wide && <div className="space-y-4 xl:sticky xl:top-20">{sidePanel}</div>}
       </div>
 
       <DriverSheet number={profile} onClose={() => setProfile(null)} />

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, ChevronDown, Crown, History, Loader2, Lock, Plus, Swords, Target, Trophy, Users } from "lucide-react";
+import { Brain, Check, ChevronDown, Crown, History, Loader2, Lock, Plus, Swords, Target, Trophy, Users } from "lucide-react";
 import { api, useAuth } from "@/lib/auth";
 import { clerkEnabled } from "@/lib/clerk";
 import { useApi } from "@/lib/useApi";
@@ -16,6 +16,16 @@ import type { LeaderboardEntry, League, Market, MarketOption, Markets, Predictio
 import { Card, Countdown, Empty, ErrorNote, Segmented, Skeleton, TeamBar, cn } from "@/components/ui";
 import { Avatar, Points } from "@/components/account/Avatar";
 import { SignInCta } from "@/components/account/ClerkControls";
+import { FantasyView } from "./FantasyView";
+import { QuizView } from "./QuizView";
+import { FantasyBoard, FriendsBoard, FriendsFeed, ShareButton } from "./Social";
+
+type Mode = "predict" | "fantasy" | "quiz";
+const TITLES: Record<Mode, { title: string; text: string }> = {
+  predict: { title: "Predict the race", text: "Call the weekend, score points for every correct call, and climb the rankings. Bolder calls score more." },
+  fantasy: { title: "Fantasy team", text: "Build a team of five drivers and two constructors within budget. Real results, real points." },
+  quiz: { title: "Weekly quiz", text: "Five questions from F1 history, new every week, for extra points." },
+};
 
 export function PlayView() {
   const { user } = useAuth();
@@ -27,6 +37,7 @@ export function PlayView() {
   const [local, setLocal] = useState<Record<string, string | null>>({}); // optimistic picks by market
   const [saving, setSaving] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>("predict");
 
   const picked = useMemo(() => {
     const out: Record<string, string> = {};
@@ -68,8 +79,8 @@ export function PlayView() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-bold">Predict the race</h1>
-          <p className="text-sm text-muted">Call the weekend, score points for every correct call, and climb the rankings. Bolder calls score more.</p>
+          <h1 className="font-display text-3xl font-bold">{TITLES[mode].title}</h1>
+          <p className="text-sm text-muted">{TITLES[mode].text}</p>
         </div>
         {user ? (
           <div className="rounded-2xl border border-line bg-surface px-4 py-2 shadow-card">
@@ -81,12 +92,28 @@ export function PlayView() {
         ) : null}
       </div>
 
+      <div className="[&>div]:flex [&>div]:w-full [&_button]:flex-1 sm:[&>div]:inline-flex sm:[&>div]:w-auto">
+        <Segmented
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "predict", label: <span className="flex items-center justify-center gap-1.5"><Target size={14} /> Predict</span> },
+            { value: "fantasy", label: <span className="flex items-center justify-center gap-1.5"><Users size={14} /> Fantasy</span> },
+            { value: "quiz", label: <span className="flex items-center justify-center gap-1.5"><Brain size={14} /> Quiz</span> },
+          ]}
+        />
+      </div>
+
       {error && !weekend && <ErrorNote message={error} />}
       {message && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-500">{message}</p>}
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-4">
-          {!markets ? (
+          {mode === "fantasy" ? (
+            race ? <FantasyView season={race.season} round={race.round} /> : <Skeleton className="h-96 rounded-2xl" />
+          ) : mode === "quiz" ? (
+            <QuizView />
+          ) : !markets ? (
             <Skeleton className="h-96 rounded-2xl" />
           ) : (
             <>
@@ -110,8 +137,9 @@ export function PlayView() {
           )}
         </div>
         <div className="space-y-4 lg:sticky lg:top-20">
-          <Rankings signedIn={Boolean(user)} version={version} />
-          {user && <HistoryCard version={version} />}
+          <Rankings signedIn={Boolean(user)} version={version} season={race?.season ?? null} initial={mode === "fantasy" ? "fantasy" : "everyone"} key={mode} />
+          {user && mode === "predict" && <HistoryCard version={version} />}
+          {user && <FriendsFeed />}
         </div>
       </div>
     </div>
@@ -253,6 +281,7 @@ function HistoryCard({ version }: { version: number }) {
               <div className="text-right">
                 <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] font-bold uppercase", STATUS_STYLE[p.status])}>{p.status}</span>
                 <p className="mt-0.5 text-xs tnum text-muted">{p.status === "correct" ? `+${p.earned}` : "0"}</p>
+                {p.status === "correct" && <ShareButton url={`/c/${p._id}`} title={`I called ${p.pickLabel}!`} className="-mr-2" />}
               </div>
             </li>
           ))}
@@ -262,17 +291,26 @@ function HistoryCard({ version }: { version: number }) {
   );
 }
 
-function Rankings({ signedIn, version }: { signedIn: boolean; version: number }) {
-  const [tab, setTab] = useState<"everyone" | "tribes" | "leagues">("everyone");
+type RankTab = "everyone" | "friends" | "tribes" | "fantasy" | "leagues";
+
+function Rankings({ signedIn, version, season, initial }: { signedIn: boolean; version: number; season: number | null; initial: RankTab }) {
+  const [tab, setTab] = useState<RankTab>(initial);
   const options = [
-    { value: "everyone" as const, label: "Everyone" },
+    { value: "everyone" as const, label: "All" },
+    ...(signedIn ? [{ value: "friends" as const, label: "Friends" }] : []),
     { value: "tribes" as const, label: "Tribes" },
+    { value: "fantasy" as const, label: "Fantasy" },
     ...(signedIn ? [{ value: "leagues" as const, label: "Leagues" }] : []),
   ];
   return (
-    <Card title="Rankings" icon={<Trophy size={15} />} right={<Segmented size="sm" value={tab} onChange={setTab} options={options} />}>
+    <Card title="Rankings" icon={<Trophy size={15} />}>
+      <div className="scroll-thin -mx-1 mb-3 overflow-x-auto px-1 [&>div]:flex [&>div]:w-full [&_button]:flex-1">
+        <Segmented size="sm" value={tab} onChange={setTab} options={options} />
+      </div>
       {tab === "everyone" && <GlobalBoard version={version} />}
+      {tab === "friends" && <FriendsBoard />}
       {tab === "tribes" && <TribeBoard />}
+      {tab === "fantasy" && (season ? <FantasyBoard season={season} /> : <Skeleton className="h-40" />)}
       {tab === "leagues" && <Leagues />}
     </Card>
   );

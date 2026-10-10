@@ -14,6 +14,11 @@ import { calendarRouter } from './calendar.js';
 import { logCrashes, observeRouter, requestLog } from './observe.js';
 import { pushRouter, startPushNotifications } from './push.js';
 import { startTranscripts } from './transcribe.js';
+import { chatRouter, startChat } from './chat.js';
+import { pollsRouter } from './polls.js';
+import { fantasyRouter } from './fantasy.js';
+import { getQuiz, quizRouter } from './quiz.js';
+import { socialRouter } from './social.js';
 
 const PORT = Number(process.env.PORT) || 4000;
 const app = express();
@@ -26,7 +31,7 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || false }));
 app.use(express.json({ limit: '100kb' }));
 app.use(requireJson);
 // Compress JSON, but never the live event stream (it must flush immediately).
-app.use(compression({ filter: (req, res) => !req.path.startsWith('/api/live/stream') && compression.filter(req, res) }));
+app.use(compression({ filter: (req, res) => !req.path.endsWith('/stream') && compression.filter(req, res) }));
 
 // Wraps an async handler for public data: JSON response with a short browser cache,
 // or a 502 with the upstream error.
@@ -61,7 +66,12 @@ app.use('/api', observeRouter());
 app.use('/api', authMiddleware(), loadUser);
 app.use('/api/auth', authRouter());
 app.use('/api', profileRouter(requireUser));
+app.use('/api/game/fantasy', fantasyRouter(requireUser));
+app.use('/api/game/quiz', quizRouter(requireUser));
 app.use('/api/game', gameRouter(requireUser));
+app.use('/api/chat', chatRouter(requireUser));
+app.use('/api/polls', pollsRouter(live));
+app.use('/api', socialRouter(requireUser, live));
 app.use('/api/calendar', calendarRouter(requireUser));
 app.use('/api/push', pushRouter());
 
@@ -164,8 +174,11 @@ await connectMongo();
 if (mongoReady()) startScoringJob();
 startPushNotifications(live);
 startTranscripts(live);
+await startChat();
 // Fetch the world champions list in the background (one request per season).
 setTimeout(() => jolpica.warmChampions(), 5000).unref();
+// Prepare this week's quiz in the background (it reads several seasons of results).
+setTimeout(() => getQuiz().catch(() => {}), 15_000).unref();
 
 const server = app.listen(PORT, () => {
   console.log(`F1 server listening on http://localhost:${PORT}`);
