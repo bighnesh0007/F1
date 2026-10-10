@@ -11,10 +11,43 @@ export type ConnectionInfo = {
   lastError: string | null;
 };
 
-export type LiveUpdate = { topic: string; data: any; replace: boolean };
+export type LiveUpdate = { topic: string; data: any; replace: boolean; ts?: string };
 
-const isObject = (v: unknown): v is Record<string, any> =>
-  v !== null && typeof v === "object" && !Array.isArray(v);
+export type LiveEvent = {
+  type: "overtake" | "pitIn" | "pitOut" | "fastestLap" | "retired" | "trackStatus" | "sessionStatus" | "raceControl" | "radio";
+  ts: string;
+  driver?: string;
+  passed?: string;
+  position?: number;
+  lap?: number;
+  time?: string;
+  compound?: string;
+  newTyres?: boolean;
+  change?: number | null;
+  stops?: number;
+  status?: string;
+  message?: string;
+  category?: string;
+  flag?: string | null;
+  path?: string;
+  session?: string;
+};
+
+export type LapEntry = {
+  lap: number;
+  time: string | null;
+  position: number | null;
+  gap: string | null;
+  interval: string | null;
+  sectors: (string | null)[];
+  compound: string | null;
+  pit: boolean;
+  ts: string;
+};
+
+export type CarProgress = { p?: number; pMax?: number; t?: number; lapMs?: number; pit?: boolean; out?: boolean };
+
+const isObject = (v: unknown): v is Record<string, any> => v !== null && typeof v === "object" && !Array.isArray(v);
 
 export function deepMerge(target: any, patch: any): any {
   if (!isObject(patch)) return patch;
@@ -43,21 +76,46 @@ export function list<T = any>(value: unknown): T[] {
     .map((k) => value[k] as T);
 }
 
-export const TRACK_STATUS: Record<string, { label: string; className: string }> = {
-  "1": { label: "Green flag", className: "bg-green-600 text-white" },
-  "2": { label: "Yellow flag", className: "bg-yellow-400 text-black" },
-  "4": { label: "Safety car", className: "bg-yellow-400 text-black" },
-  "5": { label: "Red flag", className: "bg-red-600 text-white" },
-  "6": { label: "Virtual safety car", className: "bg-yellow-400 text-black" },
-  "7": { label: "VSC ending", className: "bg-yellow-300 text-black" },
+export function isRaceSession(topics: Topics) {
+  const type = topics.SessionInfo?.Type ?? "";
+  return type === "Race" || /sprint$/i.test(topics.SessionInfo?.Name ?? "");
+}
+
+export const TRACK_STATUS: Record<string, { label: string; tone: "green" | "yellow" | "red" | "sc" }> = {
+  "1": { label: "Green flag", tone: "green" },
+  "2": { label: "Yellow flag", tone: "yellow" },
+  "4": { label: "Safety car", tone: "sc" },
+  "5": { label: "Red flag", tone: "red" },
+  "6": { label: "Virtual safety car", tone: "sc" },
+  "7": { label: "VSC ending", tone: "sc" },
 };
 
-export const TYRES: Record<string, { short: string; className: string }> = {
-  SOFT: { short: "S", className: "border-red-500 text-red-400" },
-  MEDIUM: { short: "M", className: "border-yellow-400 text-yellow-300" },
-  HARD: { short: "H", className: "border-neutral-200 text-neutral-100" },
-  INTERMEDIATE: { short: "I", className: "border-green-500 text-green-400" },
-  WET: { short: "W", className: "border-blue-500 text-blue-400" },
+export const TYRES: Record<string, { short: string; color: string; name: string }> = {
+  SOFT: { short: "S", color: "#ef4444", name: "Soft" },
+  MEDIUM: { short: "M", color: "#eab308", name: "Medium" },
+  HARD: { short: "H", color: "#e5e5e5", name: "Hard" },
+  INTERMEDIATE: { short: "I", color: "#22c55e", name: "Intermediate" },
+  WET: { short: "W", color: "#3b82f6", name: "Wet" },
 };
 
 export const LIVETIMING_STATIC = "https://livetiming.formula1.com/static/";
+
+// The live view is shown while a session is running, and for a while after it.
+export function sessionIsActive(topics: Topics, connection: ConnectionInfo | null) {
+  if (!topics.SessionInfo || connection?.status !== "connected") return false;
+  const status = topics.SessionStatus?.Status;
+  const end = Date.parse(topics.SessionInfo.EndDate ? `${topics.SessionInfo.EndDate}Z` : "");
+  const offsetMs = parseOffset(topics.SessionInfo.GmtOffset);
+  const endUtc = isNaN(end) ? null : end - offsetMs;
+  if (["Started", "Aborted", "Inactive", "Suspended"].includes(status)) {
+    return endUtc == null || Date.now() < endUtc + 2 * 3600_000;
+  }
+  // Finished sessions stay up for an hour so the final classification can be read.
+  return endUtc != null && Date.now() < endUtc + 3600_000;
+}
+
+function parseOffset(gmtOffset = "00:00:00") {
+  const negative = String(gmtOffset).startsWith("-");
+  const [h, m] = String(gmtOffset).replace("-", "").split(":").map(Number);
+  return (negative ? -1 : 1) * ((h || 0) * 60 + (m || 0)) * 60_000;
+}

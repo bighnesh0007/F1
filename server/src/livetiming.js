@@ -119,10 +119,7 @@ export class LiveTimingClient extends EventEmitter {
 
   async subscribe() {
     const snapshot = await this.connection.invoke('Subscribe', TOPICS);
-    this.state.reset();
-    for (const [topic, data] of Object.entries(snapshot || {})) {
-      this.state.apply(topic, data);
-    }
+    this.state.load(snapshot);
     this.lastMessageAt = new Date().toISOString();
     this.setStatus('connected');
     this.lastError = null;
@@ -132,8 +129,7 @@ export class LiveTimingClient extends EventEmitter {
   handle(topic, data, timestamp) {
     this.lastMessageAt = new Date().toISOString();
     try {
-      const update = this.state.apply(topic, data, timestamp);
-      if (update) this.emit('update', update);
+      for (const update of this.state.apply(topic, data, timestamp)) this.emit('update', update);
     } catch (err) {
       console.error(`Failed to process ${topic}:`, err.message);
     }

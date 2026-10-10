@@ -1,17 +1,120 @@
 @import "tailwindcss";
 
+/* Theme: warm charcoal (dark) / warm paper (light). The accent follows the user's
+   favourite team when "team colours" is on (set from JS as --accent). */
 :root {
-  --background: #0b0b0f;
-  --foreground: #ededed;
+  --bg: #f5f3ef;
+  --surface: #ffffff;
+  --surface-2: #f0ede7;
+  --surface-3: #e7e3db;
+  --border: #e3ded5;
+  --border-strong: #d2ccc1;
+  --text: #1c1a1f;
+  --muted: #5f5a66;
+  --faint: #8d8893;
+  --accent: #e10600;
+  --accent-ink: #ffffff;
+  --good: #15803d;
+  --bad: #c2410c;
+  --purple: #8b3fd9;
+  --yellow: #ca8a04;
+  --shadow: 0 1px 2px rgb(28 26 31 / 0.05), 0 8px 24px -12px rgb(28 26 31 / 0.12);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0e0d10;
+  --surface: #17151a;
+  --surface-2: #1e1c22;
+  --surface-3: #27242c;
+  --border: #2a2730;
+  --border-strong: #3a3641;
+  --text: #f4f2ef;
+  --muted: #aaa5b1;
+  --faint: #76717d;
+  --good: #4ade80;
+  --bad: #fb923c;
+  --purple: #c084fc;
+  --yellow: #facc15;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0d10;
+    --surface: #17151a;
+    --surface-2: #1e1c22;
+    --surface-3: #27242c;
+    --border: #2a2730;
+    --border-strong: #3a3641;
+    --text: #f4f2ef;
+    --muted: #aaa5b1;
+    --faint: #76717d;
+    --good: #4ade80;
+    --bad: #fb923c;
+    --purple: #c084fc;
+    --yellow: #facc15;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+    color-scheme: dark;
+  }
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --color-purple: var(--purple);
+  --color-yellow: var(--yellow);
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Titillium Web", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --shadow-card: var(--shadow);
+}
+
+html {
+  background: var(--bg);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thin, unobtrusive scrollbars inside panels. */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+.live-dot {
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
