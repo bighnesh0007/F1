@@ -23,6 +23,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-}
       NEWS_FEEDS: ${NEWS_FEEDS:-}
+      PRO_PLAN: ${PRO_PLAN:-pro}
       # Optional F1 TV token for live car positions.
       F1_AUTH_TOKEN: ${F1_AUTH_TOKEN:-}
     ports:

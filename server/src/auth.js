@@ -45,6 +45,8 @@ async function clerkDetails(clerkId) {
     displayName: u.fullName || u.username || email?.split('@')[0] || 'F1 fan',
     email,
     avatarUrl: u.imageUrl ?? null,
+    // A crypto wallet linked through Clerk's Web3 sign-in (MetaMask, Coinbase Wallet…).
+    wallet: u.primaryWeb3Wallet?.web3Wallet ?? u.web3Wallets?.[0]?.web3Wallet ?? null,
     google: { linked: Boolean(google), calendar: Boolean(google?.approvedScopes?.includes(CALENDAR_SCOPE)) },
   };
 }
@@ -92,13 +94,31 @@ async function profileFor(clerkId) {
   throw new HttpError(500, 'Could not create your profile');
 }
 
+// F1 Live Pro: a Clerk Billing plan (PRO_PLAN, default "pro"). Checked from the
+// session token, and remembered on the profile so public badges can show it.
+export function hasPro(req) {
+  try {
+    return Boolean(getAuth(req).has?.({ plan: process.env.PRO_PLAN || 'pro' }));
+  } catch {
+    return false;
+  }
+}
+
 // Attaches req.user (the app profile) when the request carries a valid Clerk session.
 export async function loadUser(req, _res, next) {
   req.user = null;
+  req.pro = false;
   if (!clerkConfigured() || !mongoReady()) return next();
   try {
     const { userId } = getAuth(req);
-    if (userId) req.user = await profileFor(userId);
+    if (userId) {
+      req.user = await profileFor(userId);
+      req.pro = hasPro(req);
+      if (Boolean(req.user.pro) !== req.pro) {
+        await mongo().collection('users').updateOne({ _id: req.user._id }, { $set: { pro: req.pro } });
+        req.user.pro = req.pro;
+      }
+    }
   } catch (err) {
     console.error('Auth:', err.message);
   }
@@ -150,6 +170,8 @@ export function selfView(user) {
     stats: user.stats ?? {},
     createdAt: user.createdAt,
     google: user.google ?? { linked: false, calendar: false },
+    wallet: user.wallet ?? null,
+    pro: Boolean(user.pro),
   };
 }
 

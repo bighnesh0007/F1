@@ -141,9 +141,15 @@ People who signed in another way can connect Google from their profile or the ca
 | MongoDB (local container or Atlas) | App profiles, settings, predictions, points, leagues | Flexible documents, easy to host on Atlas |
 | Redis (container) | Cached F1 data (schedule, results, replays, maps), the live session's lap history and race feed | Fast, survives server restarts, shared if you run several servers |
 
+## Pro (subscriptions)
+
+`/pro` sells F1 Live Pro through [Clerk Billing](https://clerk.com/docs/billing/overview): turn on Billing in the Clerk dashboard and create a plan with the key `pro` (or set `PRO_PLAN`). Pro raises the AI question limit (100/hour) and private league limit (50), and shows a Supporter badge. Everything else stays free.
+
 ## Roadmap: Web3
 
-Points are off-chain and have no monetary value. A future version could add a Web3 layer: Clerk already supports wallet sign-in (MetaMask, Coinbase Wallet, …), which would be the first step for linking a wallet to a profile; on-chain badges or a fan token could follow. Anything that can be bought or cashed out turns predictions into real-money betting in most countries, which needs a gambling licence and legal advice, and F1 and team names are trademarks.
+Points are off-chain and have no monetary value. The first step is in place: turn on **Web3 wallets** in the Clerk dashboard and fans can sign in with or link a wallet (MetaMask, Coinbase Wallet…); a linked wallet shows on their profile and earns a "Web3 ready" badge. On-chain badges or a fan token could follow. Anything that can be bought or cashed out turns predictions into real-money betting in most countries, which needs a gambling licence and legal advice, and F1 and team names are trademarks.
+
+See [ROADMAP.md](ROADMAP.md) for the status of every planned improvement.
 
 ## Project structure
 

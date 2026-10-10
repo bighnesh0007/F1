@@ -166,7 +166,7 @@ export function aiRouter(live) {
   });
 
   router.post('/ask', async (req, res) => {
-    guard(req, 20);
+    guard(req, req.pro ? 100 : 20);
     const question = String(req.body?.question ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
     if (question.length < 3) throw new HttpError(400, 'Ask a question');
     let context;

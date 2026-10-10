@@ -22,6 +22,8 @@ export type User = {
   following?: number;
   createdAt: string;
   google: { linked: boolean; calendar: boolean };
+  wallet?: string | null;
+  pro?: boolean;
 };
 
 export type Badge = { id: string; title: string; description: string; earned: boolean };

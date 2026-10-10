@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Award, CalendarCheck2, Check, Copy, Gift, Loader2, LogOut, Lock, Settings2, Sparkles, Trash2, Trophy } from "lucide-react";
+import { Award, CalendarCheck2, Check, Copy, Crown, Gift, Loader2, Lock, LogOut, Settings2, Sparkles, Trash2, Trophy, Wallet } from "lucide-react";
 import { api, useAuth } from "@/lib/auth";
 import { useApi } from "@/lib/useApi";
 import { useDrivers } from "@/lib/drivers";
@@ -321,6 +321,13 @@ function AccountCard({ user }: { user: User }) {
         <Link href={`/u/${user.handle}`} className={row}>
           <Gift size={15} className="text-faint" /> View public profile
         </Link>
+        <Link href="/pro" className={row}>
+          <Crown size={15} className={user.pro ? "text-yellow" : "text-faint"} /> {user.pro ? "F1 Live Pro: active" : "Get F1 Live Pro"}
+        </Link>
+        <button onClick={openAccount} className={row} title="Link a wallet in Manage account → Web3 wallets">
+          <Wallet size={15} className="text-faint" />
+          <span className="flex-1 truncate">{user.wallet ? `Wallet ${user.wallet.slice(0, 6)}…${user.wallet.slice(-4)}` : "Link a crypto wallet (optional)"}</span>
+        </button>
         <button onClick={openAccount} className={row}>
           <Settings2 size={15} className="text-faint" /> Manage account (email, password, sign-in methods)
         </button>

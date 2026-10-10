@@ -250,6 +250,8 @@ export const BADGES = {
   regular: { title: 'Regular', description: 'Watched 10 live sessions in the race centre' },
   host: { title: 'Host', description: 'Organised a watch party' },
   friendly: { title: 'Friendly', description: 'Following 5 fans' },
+  supporter: { title: 'Supporter', description: 'Supports F1 Live with Pro' },
+  wallet: { title: 'Web3 ready', description: 'Linked a crypto wallet' },
 };
 
 export function badgesFor(user, { inLeague = false, following = 0 } = {}) {
@@ -273,6 +275,8 @@ export function badgesFor(user, { inLeague = false, following = 0 } = {}) {
     regular: (user.watched?.length ?? 0) >= 10,
     host: (s.watchParties ?? 0) > 0,
     friendly: following >= 5,
+    supporter: Boolean(user.pro),
+    wallet: Boolean(user.wallet),
   };
   return Object.entries(BADGES).map(([id, b]) => ({ id, ...b, earned: earned[id] }));
 }
@@ -359,7 +363,8 @@ export function gameRouter(requireUser) {
     const name = String(req.body?.name ?? '').trim().slice(0, 40);
     if (!name) throw new HttpError(400, 'Give your league a name');
     const owned = await mongo().collection('leagues').countDocuments({ owner: req.user._id });
-    if (owned >= 10) throw new HttpError(400, 'You can own up to 10 leagues');
+    const maxLeagues = req.pro ? 50 : 10;
+    if (owned >= maxLeagues) throw new HttpError(400, `You can own up to ${maxLeagues} leagues${req.pro ? '' : ' (50 with Pro)'}`);
     for (let attempt = 0; attempt < 5; attempt++) {
       const code = crypto.randomBytes(4).toString('base64url').replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase().padEnd(6, 'X');
       try {
