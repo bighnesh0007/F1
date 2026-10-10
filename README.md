@@ -20,7 +20,7 @@ All configuration lives in one file: copy `.env.example` to `.env` in the projec
 
 **Live** (during a session)
 - Timing tower: positions, gaps (interval or to leader), sector colours, lap times, tyres and age, places gained. Rows slide when positions change.
-- Track map with every car. With an F1 TV token the dots are live GPS; without one they're estimated from timing data (typically within about 100 m; see below).
+- Track map with every car. With an F1 TV token the dots are live GPS; without one they're estimated from timing data (typically within about 30 m; see below).
 - Battle tracker for cars within 1 second.
 - Pop-up alerts for overtakes, pit stops (new tyre, places lost or gained), fastest laps and retirements.
 - Full-screen safety car, VSC, red flag and chequered flag moments; start-lights animation at a race start; sound effects.
@@ -36,6 +36,10 @@ All configuration lives in one file: copy `.env.example` to `.env` in the projec
 **Standings**: drivers, teams, a title-fight calculator ("can they still win it?"), a points simulator for the next race, and teammate head-to-heads.
 
 **Race centre** (`/live`): tap the LIVE badge, "Open race centre" or a live session to open a full view of the session: a big track map with every car, the timing tower, race control messages (filter flags, stewards' decisions, DRS) with the latest one shown over the map, a team radio player (tap to listen, or auto-play new radio as it comes in), a driver to follow (position, gaps to the cars around them, sectors and mini-sectors, tyres, and live speed/gear/throttle/brake with an F1 TV token), pit stops with stationary times, and the live championship during races. On phones each part is a tab.
+
+**More in the race centre**: a pit strategy board (pit window from tyre age, where each car would rejoin if it pitted now, undercut risk), head-to-head with the gap between two drivers lap by lap, all the lap-time/gap/position charts, team radio transcripts (with a speech-to-text service, see below), **Pop out** (timing in a small always-on-top window to keep over your TV stream) and **TV mode** (`/live/tv`, a big-screen layout with a ticker).
+
+**Phone notifications**: session about to start, safety car / red flag, and your driver's pit stops, even with the app closed (Settings → Phone notifications; needs VAPID keys, see below).
 
 **Stats**: all-time records (wins, titles, poles, fastest laps), every champion, and season-vs-season comparison.
 
@@ -67,7 +71,7 @@ All configuration lives in one file: copy `.env.example` to `.env` in the projec
 
 ### How the map works without F1 TV
 
-Every car reports when it passes each of the ~25 timing points ("mini-sectors") around a lap, and that part of the feed is free. The server learns where those points fall on the lap, and the browser moves each car smoothly between them at the car's current pace, stopping at the next timing point until the car is seen passing it. Tested against real recorded car positions from the 2021 Bahrain GP, the estimate was typically within about 80 m (90% within 150 m) on a 5.4 km lap.
+Every car reports when it passes each of the ~25 timing points ("mini-sectors") around a lap, and that part of the feed is free. The server learns where those points fall on the lap, and the browser moves each car smoothly between them at the car's current pace, stopping at the next timing point until the car is seen passing it. Timing messages arrive a little after the car has actually passed each point, so cars are drawn about 1.75 s behind the raw timing. Tested against real recorded car positions from the 2021 Bahrain GP (about 32,000 samples), the estimate is typically within about 30 m (median 28 m, 90% within 120 m) on a 5.4 km lap; before the delay correction it was 81 m.
 
 ### Enabling live car positions (optional)
 
@@ -142,6 +146,29 @@ server/   Node.js + Express                                 → http://localhost
   src/db/             Redis and MongoDB connections
 docker-compose.yml
 ```
+
+## Optional services
+
+**Push notifications.** Generate keys once and put them in `.env`:
+
+```bash
+npx web-push generate-vapid-keys
+```
+```
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+VAPID_SUBJECT=mailto:you@example.com
+```
+
+**Team radio transcripts.** Any OpenAI-compatible speech-to-text API works (OpenAI Whisper, Groq, or a self-hosted faster-whisper server):
+
+```
+TRANSCRIBE_URL=https://api.openai.com/v1
+TRANSCRIBE_API_KEY=...
+TRANSCRIBE_MODEL=whisper-1
+```
+
+Each clip is transcribed once and cached for 30 days.
 
 ## Tests and monitoring
 

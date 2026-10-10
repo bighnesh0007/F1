@@ -57,7 +57,7 @@ export function LiveTrackMap({
     mode === "live" ? (
       <span className="flex items-center gap-1.5 text-xs text-muted"><Satellite size={13} /> Live GPS</span>
     ) : (
-      <span className="flex items-center gap-1.5 text-xs text-muted" title="Positions are estimated from timing data (accurate to roughly 100 m). Add an F1 TV token for exact positions.">
+      <span className="flex items-center gap-1.5 text-xs text-muted" title="Positions are estimated from timing data (typically within about 30 m). Add an F1 TV token for exact positions.">
         <Waypoints size={13} /> Estimated from timing
       </span>
     );

@@ -103,7 +103,7 @@ export function FeedPanel() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
               >
-                <FeedItem event={e} sessionPath={topics.SessionInfo?.Path} />
+                <FeedItem event={e} sessionPath={topics.SessionInfo?.Path} transcript={e.path ? topics.RadioTranscripts?.[e.path] : undefined} />
               </motion.li>
             ))}
           </AnimatePresence>
@@ -151,7 +151,7 @@ function flagTone(flag?: string | null) {
   return "text-muted";
 }
 
-function FeedItem({ event, sessionPath }: { event: LiveEvent; sessionPath?: string }) {
+function FeedItem({ event, sessionPath, transcript }: { event: LiveEvent; sessionPath?: string; transcript?: string }) {
   const { get } = useDrivers();
   const { settings } = useSettings();
   const tla = (n?: string) => (n ? get(n).tla : "");
@@ -169,6 +169,7 @@ function FeedItem({ event, sessionPath }: { event: LiveEvent; sessionPath?: stri
         {event.type === "radio" && sessionPath && event.path && (
           <audio controls preload="none" className="mt-1.5 h-8 w-full" src={`${LIVETIMING_STATIC}${sessionPath}${event.path}`} />
         )}
+        {event.type === "radio" && event.path && transcript && <p className="mt-1 text-sm leading-snug italic">&ldquo;{transcript}&rdquo;</p>}
       </div>
     </div>
   );
@@ -197,6 +198,7 @@ export function RadioPanel() {
                   <span className="text-faint">{localTime(c.Utc, { second: "2-digit" })}</span>
                 </p>
                 <audio controls preload="none" className="h-8 w-full" src={`${LIVETIMING_STATIC}${path}${c.Path}`} />
+                {c.Path && topics.RadioTranscripts?.[c.Path] && <p className="mt-1 text-sm leading-snug italic">&ldquo;{topics.RadioTranscripts[c.Path]}&rdquo;</p>}
               </li>
             );
           })}

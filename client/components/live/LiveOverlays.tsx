@@ -49,7 +49,9 @@ export function LiveOverlays() {
       if (event.type === "radio" && s.sounds) sounds.radio();
 
       // Alerts are for races; practice and qualifying set "fastest laps" constantly.
-      if (TOAST_TYPES.has(event.type) && s.alerts && race) {
+      // TV mode and the pop-out window have their own ticker.
+      const ownTicker = /^\/live\/(tv|mini)/.test(window.location.pathname);
+      if (TOAST_TYPES.has(event.type) && s.alerts && race && !ownTicker) {
         const mine = Boolean(s.favouriteDriver && (event.driver === s.favouriteDriver || event.passed === s.favouriteDriver));
         const id = nextId.current++;
         setToasts((prev) => [...prev.slice(-2), { id, event, mine }]);

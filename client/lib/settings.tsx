@@ -18,6 +18,10 @@ export type Settings = {
   livePanels: { id: LivePanel; visible: boolean }[];
   colourBlind: boolean;
   reduceMotion: boolean;
+  // Push notifications (sent by the server, even with the app closed).
+  pushSessions: boolean;
+  pushFlags: boolean;
+  pushDriver: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -39,6 +43,9 @@ export const DEFAULT_SETTINGS: Settings = {
   ],
   colourBlind: false,
   reduceMotion: false,
+  pushSessions: false,
+  pushFlags: false,
+  pushDriver: false,
 };
 
 const STORAGE_KEY = "f1live.settings";

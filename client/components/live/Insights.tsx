@@ -10,11 +10,12 @@ import { isRaceSession, list, TYRES, type LapEntry } from "@/lib/live";
 import { formatLapTime, parseLapTime } from "@/lib/format";
 import { Card, Empty, Segmented, TeamBar, cn } from "@/components/ui";
 import { gapSeconds, useTowerRows } from "./TimingTower";
+import { StrategyPredictor } from "./StrategyPredictor";
 
-type Tab = "gaps" | "laps" | "positions" | "strategy" | "h2h";
+type Tab = "gaps" | "laps" | "positions" | "strategy" | "pits" | "h2h";
 const MAX_HIGHLIGHT = 5;
 
-export function Insights() {
+export function Insights({ focus = null }: { focus?: string | null }) {
   const { topics } = useLive();
   const race = isRaceSession(topics);
   const [tab, setTab] = useState<Tab>(race ? "gaps" : "laps");
@@ -40,20 +41,28 @@ export function Insights() {
     { value: "laps", label: "Lap times" },
     ...(race ? [{ value: "positions" as Tab, label: "Positions" }] : []),
     { value: "strategy", label: "Tyres" },
+    ...(race ? [{ value: "pits" as Tab, label: "Pit strategy" }] : []),
     { value: "h2h", label: "Head-to-head" },
   ];
   const active = tabs.some((t) => t.value === tab) ? tab : tabs[0].value;
 
   return (
     <Card title="Insights" icon={<LineIcon size={15} />} right={<div className="max-w-full overflow-x-auto"><Segmented size="sm" value={active} onChange={setTab} options={tabs} /></div>}>
-      {active !== "strategy" && active !== "h2h" && <DriverChips rows={rows.map((r) => r.number)} selected={selected} onToggle={toggle} />}
+      {active !== "strategy" && active !== "h2h" && active !== "pits" && <DriverChips rows={rows.map((r) => r.number)} selected={selected} onToggle={toggle} />}
       {active === "gaps" && <GapChart selected={selected} />}
       {active === "laps" && <LapChart selected={selected} />}
       {active === "positions" && <PositionChart selected={selected} />}
       {active === "strategy" && <StrategyChart />}
-      {active === "h2h" && <HeadToHead initial={[selected[0], selected[1]]} />}
+      {active === "pits" && <StrategyPredictor focus={focus} />}
+      {active === "h2h" && <HeadToHead initial={focus ? [focus, rivalOf(rows.map((r) => r.number), focus)] : [selected[0], selected[1]]} key={focus ?? ""} />}
     </Card>
   );
+}
+
+// The car just ahead, or for the leader the car in second.
+function rivalOf(order: string[], n: string) {
+  const i = order.indexOf(n);
+  return i > 0 ? order[i - 1] : order[1];
 }
 
 function DriverChips({ rows, selected, onToggle }: { rows: string[]; selected: string[]; onToggle: (n: string) => void }) {
@@ -289,6 +298,14 @@ function HeadToHead({ initial }: { initial: (string | undefined)[] }) {
     .map((lap) => ({ lap, delta: Number((lapsB.get(lap)! - lapsA.get(lap)!).toFixed(3)) }))
     .filter((d) => Math.abs(d.delta) < 5);
 
+  // Gap between the two at the end of each lap (from their gaps to the leader).
+  const gapA = new Map((history[a] ?? []).map((l) => [l.lap, l.position === 1 ? 0 : gapSeconds(l.gap)]));
+  const gaps = (history[b] ?? [])
+    .map((l) => ({ lap: l.lap, b: l.position === 1 ? 0 : gapSeconds(l.gap), a: gapA.get(l.lap) }))
+    .filter((g): g is { lap: number; a: number; b: number } => g.a != null && g.b != null)
+    .map((g) => ({ lap: g.lap, gap: Number((g.b - g.a).toFixed(3)) }))
+    .filter((g) => Math.abs(g.gap) < 120);
+
   const avg = (m: Map<number, number | null>) => {
     const v = [...m.values()].filter((x): x is number => x != null).slice(-5);
     return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
@@ -330,6 +347,37 @@ function HeadToHead({ initial }: { initial: (string | undefined)[] }) {
           })}
         </tbody>
       </table>
+      {gaps.length >= 2 && (
+        <div>
+          <p className="mb-1 text-xs text-muted">
+            Gap between them after each lap: above the line <b className="text-ink">{da.tla}</b> is ahead, below it <b className="text-ink">{db.tla}</b>.
+          </p>
+          <div className="h-40">
+            <ResponsiveContainer>
+              <LineChart data={gaps} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
+                <CartesianGrid stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="lap" {...axis} />
+                <YAxis {...axis} width={48} tickFormatter={(v) => `${v > 0 ? "+" : ""}${Number(v).toFixed(1)}s`} />
+                <ReferenceLine y={0} stroke="var(--border-strong)" />
+                <Tooltip
+                  cursor={{ stroke: "var(--border-strong)" }}
+                  content={({ active, payload, label }) =>
+                    active && payload?.length ? (
+                      <div className="rounded-xl border border-line bg-surface px-3 py-2 text-xs shadow-card">
+                        <p className="font-semibold">Lap {label}</p>
+                        <p className="text-muted">
+                          {Number(payload[0].value) >= 0 ? da.tla : db.tla} ahead by {Math.abs(Number(payload[0].value)).toFixed(3)}s
+                        </p>
+                      </div>
+                    ) : null
+                  }
+                />
+                <Line dataKey="gap" stroke={colourA} strokeWidth={2} dot={false} isAnimationActive={false} activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--surface)" }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
       {deltas.length >= 2 ? (
         <div>
           <p className="mb-1 text-xs text-muted">

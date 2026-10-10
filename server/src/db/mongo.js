@@ -32,6 +32,8 @@ export async function connectMongo() {
     db.collection('predictions').createIndex({ status: 1, season: 1, round: 1 }),
     db.collection('leagues').createIndex({ code: 1 }, { unique: true }),
     db.collection('leagues').createIndex({ members: 1 }),
+    db.collection('pushSubscriptions').createIndex({ endpoint: 1 }, { unique: true }),
+    db.collection('pushSubscriptions').createIndex({ 'prefs.driver': 1 }),
   ]);
   console.log('MongoDB: connected');
   return db;

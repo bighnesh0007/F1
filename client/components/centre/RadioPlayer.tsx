@@ -40,6 +40,7 @@ export function RadioPlayer({ focus }: { focus: string | null }) {
   const { topics } = useLive();
   const { get } = useDrivers();
   const path = topics.SessionInfo?.Path as string | undefined;
+  const transcripts: Record<string, string> = topics.RadioTranscripts ?? {};
   const captures = list<Capture>(topics.TeamRadio?.Captures).filter((c) => c.Path);
   const audio = useRef<HTMLAudioElement>(null);
   const [current, setCurrent] = useState<Capture | null>(null);
@@ -120,6 +121,7 @@ export function RadioPlayer({ focus }: { focus: string | null }) {
               <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-3">
                 <div className="h-full rounded-full transition-[width] duration-200" style={{ width: `${progress * 100}%`, background: `#${d.colour}` }} />
               </div>
+              {transcripts[current.Path!] && <p className="mt-2 text-sm leading-snug italic">&ldquo;{transcripts[current.Path!]}&rdquo;</p>}
               {failed && <p className="mt-1 text-xs text-bad">This clip couldn&apos;t be loaded.</p>}
             </div>
             <button
@@ -166,6 +168,7 @@ export function RadioPlayer({ focus }: { focus: string | null }) {
                   <span className="min-w-0 flex-1">
                     <span className="font-display font-bold">{driver.tla}</span>
                     <span className="ml-2 text-sm text-muted">{driver.fullName}</span>
+                    {transcripts[c.Path!] && <span className="mt-0.5 block text-xs leading-snug text-muted italic">&ldquo;{transcripts[c.Path!]}&rdquo;</span>}
                   </span>
                   {!played.has(c.Path!) && <span className="h-1.5 w-1.5 rounded-full bg-accent" title="Not played yet" />}
                   <span className="tnum text-xs text-faint">{localTime(c.Utc, { second: "2-digit" })}</span>

@@ -12,6 +12,8 @@ import { profileRouter } from './profile.js';
 import { gameRouter, startScoringJob } from './game.js';
 import { calendarRouter } from './calendar.js';
 import { logCrashes, observeRouter, requestLog } from './observe.js';
+import { pushRouter, startPushNotifications } from './push.js';
+import { startTranscripts } from './transcribe.js';
 
 const PORT = Number(process.env.PORT) || 4000;
 const app = express();
@@ -61,6 +63,7 @@ app.use('/api/auth', authRouter());
 app.use('/api', profileRouter(requireUser));
 app.use('/api/game', gameRouter(requireUser));
 app.use('/api/calendar', calendarRouter(requireUser));
+app.use('/api/push', pushRouter());
 
 // --- Live -----------------------------------------------------------------------
 
@@ -159,6 +162,8 @@ app.use((err, req, res, _next) => {
 await connectRedis();
 await connectMongo();
 if (mongoReady()) startScoringJob();
+startPushNotifications(live);
+startTranscripts(live);
 // Fetch the world champions list in the background (one request per season).
 setTimeout(() => jolpica.warmChampions(), 5000).unref();
 

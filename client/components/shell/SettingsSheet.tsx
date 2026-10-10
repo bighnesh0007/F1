@@ -6,6 +6,8 @@ import { useDrivers } from "@/lib/drivers";
 import { sounds } from "@/lib/sound";
 import { timeZoneName } from "@/lib/format";
 import { Segmented, Sheet, TeamBar, cn } from "@/components/ui";
+import { Section, Toggle } from "./Toggle";
+import { PushSettings } from "./PushSettings";
 import { useNow } from "@/lib/useNow";
 
 const PANEL_LABELS: Record<LivePanel, string> = {
@@ -118,6 +120,8 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           />
         </Section>
 
+        <PushSettings />
+
         <Section icon={<Bell size={16} />} title="Session reminders" hint="A notification before each session starts, while this app is open in a tab. To be reminded when it's closed, add sessions to your calendar from the Schedule page.">
           <Toggle label="Remind me" checked={settings.reminders} onChange={requestReminders} />
           {settings.reminders && (
@@ -162,36 +166,4 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   );
 }
 
-function Section({ icon, title, hint, children }: { icon: React.ReactNode; title: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <div>
-        <h3 className="flex items-center gap-2 font-semibold">
-          <span className="text-accent">{icon}</span>
-          {title}
-        </h3>
-        {hint && <p className="mt-0.5 text-sm text-muted">{hint}</p>}
-      </div>
-      {children}
-    </section>
-  );
-}
 
-function Toggle({ label, hint, checked, onChange, icon }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; icon?: React.ReactNode }) {
-  return (
-    <label className="flex cursor-pointer items-start justify-between gap-4">
-      <span>
-        <span className="flex items-center gap-1.5 text-sm font-medium">{icon}{label}</span>
-        {hint && <span className="block text-xs text-muted">{hint}</span>}
-      </span>
-      <button
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={cn("relative mt-0.5 h-6 w-10 shrink-0 rounded-full transition-colors", checked ? "bg-accent" : "bg-surface-3")}
-      >
-        <span className={cn("absolute top-0.5 left-0 h-5 w-5 rounded-full bg-white shadow transition-transform", checked ? "translate-x-[18px]" : "translate-x-0.5")} />
-      </button>
-    </label>
-  );
-}

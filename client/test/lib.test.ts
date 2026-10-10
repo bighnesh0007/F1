@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { applyUpdate, deepMerge, list, sessionIsActive } from "../lib/live";
-import { estimateFraction } from "../lib/track";
+import { estimateFraction, TIMING_LAG_MS } from "../lib/track";
 import { formatLapTime, ordinal, parseLapTime } from "../lib/format";
 
 describe("live state", () => {
@@ -29,9 +29,15 @@ describe("live state", () => {
 describe("car position estimate", () => {
   test("moves with time but never past the next timing point", () => {
     const p = { p: 0.5, pMax: 0.55, t: 0, lapMs: 90_000 };
-    expect(estimateFraction(p, 9_000)).toBeCloseTo(0.554, 3);
-    expect(estimateFraction({ ...p, pMax: undefined }, 9_000)).toBeCloseTo(0.6, 5);
+    expect(estimateFraction(p, 9_000 + TIMING_LAG_MS)).toBeCloseTo(0.554, 3);
+    expect(estimateFraction({ ...p, pMax: undefined }, 9_000 + TIMING_LAG_MS)).toBeCloseTo(0.6, 5);
     expect(estimateFraction({ p: 0.5 }, 1000)).toBeNull();
+  });
+
+  test("allows for timing delay, wrapping back over the finish line", () => {
+    const start = { p: 0, pMax: 0.05, t: 0, lapMs: 100_000 };
+    expect(estimateFraction(start, 0)).toBeCloseTo(1 - TIMING_LAG_MS / 100_000, 5);
+    expect(estimateFraction(start, TIMING_LAG_MS)).toBe(0);
   });
 });
 

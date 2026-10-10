@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, Flag, History, Map as MapIcon, Radio, Timer, Trophy } from "lucide-react";
+import { ArrowLeft, Flag, History, Map as MapIcon, Radio, Timer, Trophy, Tv } from "lucide-react";
 import { useLive } from "@/lib/live-context";
 import { useSettings } from "@/lib/settings";
 import { useApi } from "@/lib/useApi";
@@ -18,14 +18,16 @@ import { BattlesPanel, WeatherPanel } from "@/components/live/SidePanels";
 import dynamic from "next/dynamic";
 import { LatestMessageBanner, RaceControlList, useRaceControl } from "./RaceControl";
 import { RadioPlayer } from "./RadioPlayer";
+import { PopOutButton } from "./PopOut";
 import { DriverFocus } from "./DriverFocus";
 import { LiveChampionship, PitStops } from "./PitsAndTitle";
 
 // Charts in the driver sheet load when it is first opened.
+const Insights = dynamic(() => import("@/components/live/Insights").then((m) => m.Insights));
 const DriverSheet = dynamic(() => import("@/components/live/DriverSheet").then((m) => m.DriverSheet));
 
 type SideTab = "control" | "radio" | "pits" | "title";
-type MobileTab = "track" | "timing" | "driver" | "control" | "radio";
+type MobileTab = "track" | "timing" | "driver" | "charts" | "control" | "radio";
 
 // A full view of one live session: big map, timing, race control, team radio, a
 // driver to follow, pit stops and the live championship.
@@ -82,9 +84,15 @@ export function RaceCentre() {
     <div className="space-y-4">
       <SessionBar
         action={
-          <Link href="/" className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-ink">
-            <ArrowLeft size={14} /> Overview
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <PopOutButton />
+            <Link href="/live/tv" className="hidden items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-ink md:flex">
+              <Tv size={14} /> TV mode
+            </Link>
+            <Link href="/" className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-ink">
+              <ArrowLeft size={14} /> Overview
+            </Link>
+          </div>
         }
       />
 
@@ -99,6 +107,7 @@ export function RaceCentre() {
             { value: "track", label: "Track" },
             { value: "timing", label: "Timing" },
             { value: "driver", label: "Driver" },
+            { value: "charts", label: "Charts" },
             { value: "control", label: "Control" },
             { value: "radio", label: "Radio" },
           ]}
@@ -123,6 +132,9 @@ export function RaceCentre() {
                 setCleared(true);
               }}
             />
+          </div>
+          <div className={show("charts")}>
+            <Insights focus={focus} />
           </div>
           <div className={cn("xl:hidden", mobile === "control" || mobile === "radio" ? "" : "max-lg:hidden")}>{sidePanel}</div>
           <div className="grid gap-4 max-lg:hidden md:grid-cols-2">
