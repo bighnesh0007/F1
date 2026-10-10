@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Star, Trophy } from "lucide-react";
@@ -139,7 +140,10 @@ function SeasonSection({ code }: { code: string }) {
 
   return (
     <section>
-      <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-muted"><Trophy size={14} /> {standings?.season ?? ""} season</h3>
+      <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-muted">
+        <Trophy size={14} /> {standings?.season ?? ""} season
+        {entry && <Link href={`/drivers/${entry.driver.id}`} className="ml-auto text-xs font-semibold text-accent">Career →</Link>}
+      </h3>
       <Spoiler label="Season stats hidden">
         <div className="grid grid-cols-3 gap-2">
           <Tile label="Championship" value={entry?.position ? ordinal(entry.position) : "–"} sub={entry ? `${entry.points} pts` : undefined} />

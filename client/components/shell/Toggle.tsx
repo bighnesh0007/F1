@@ -1,13 +1,15 @@
 "use client";
 
 import { cn } from "@/components/ui";
+import { useT } from "@/lib/i18n";
 
 export function Toggle({ label, hint, checked, onChange, icon }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; icon?: React.ReactNode }) {
+  const t = useT();
   return (
     <label className="flex cursor-pointer items-start justify-between gap-4">
       <span>
-        <span className="flex items-center gap-1.5 text-sm font-medium">{icon}{label}</span>
-        {hint && <span className="block text-xs text-muted">{hint}</span>}
+        <span className="flex items-center gap-1.5 text-sm font-medium">{icon}{t(label)}</span>
+        {hint && <span className="block text-xs text-muted">{t(hint)}</span>}
       </span>
       <button
         role="switch"
@@ -22,14 +24,15 @@ export function Toggle({ label, hint, checked, onChange, icon }: { label: string
 }
 
 export function Section({ icon, title, hint, children }: { icon: React.ReactNode; title: string; hint?: string; children: React.ReactNode }) {
+  const t = useT();
   return (
     <section className="space-y-3">
       <div>
         <h3 className="flex items-center gap-2 font-semibold">
           <span className="text-accent">{icon}</span>
-          {title}
+          {t(title)}
         </h3>
-        {hint && <p className="mt-0.5 text-sm text-muted">{hint}</p>}
+        {hint && <p className="mt-0.5 text-sm text-muted">{t(hint)}</p>}
       </div>
       {children}
     </section>

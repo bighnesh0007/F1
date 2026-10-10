@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n";
 import Link from "next/link";
 import { useState } from "react";
 import { Maximize2 } from "lucide-react";
@@ -20,6 +21,7 @@ const DriverSheet = dynamic(() => import("./DriverSheet").then((m) => m.DriverSh
 type MobileTab = "timing" | "track" | "feed" | "insights";
 
 export function LiveView() {
+  const t = useT();
   const { settings } = useSettings();
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<MobileTab>("timing");
@@ -41,7 +43,7 @@ export function LiveView() {
       <SessionBar
         action={
           <Link href="/live" className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-bold text-accent-ink shadow-card hover:opacity-90">
-            <Maximize2 size={14} /> Open race centre
+            <Maximize2 size={14} /> {t("Open race centre")}
           </Link>
         }
       />

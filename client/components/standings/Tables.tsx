@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Star } from "lucide-react";
 import type { Standings } from "@/lib/types";
 import { useDrivers, useTeamColour } from "@/lib/drivers";
@@ -25,7 +26,7 @@ export function DriverTable({ standings }: { standings: Standings }) {
               <Headshot src={live?.headshot} colour={colour} size={40} alt={d.driver.code} />
               <span className="min-w-0">
                 <span className="flex items-center gap-1.5 font-semibold">
-                  <span className="truncate">{d.driver.name}</span>
+                  <Link href={`/drivers/${d.driver.id}`} className="truncate hover:underline">{d.driver.name}</Link>
                   <span className="text-sm">{nationalityFlag(d.driver.nationality)}</span>
                   {fav && <Star size={12} className="fill-current text-accent" />}
                 </span>
@@ -60,7 +61,7 @@ export function ConstructorTable({ standings }: { standings: Standings }) {
               <span className="flex min-w-0 items-center gap-2.5">
                 <TeamBar colour={colour} className="h-8 w-1.5" />
                 <span className="min-w-0">
-                  <span className="block truncate font-semibold">{c.team}</span>
+                  <Link href={`/teams/${c.teamId}`} className="block truncate font-semibold hover:underline">{c.team}</Link>
                   <span className="block text-xs text-muted">{c.wins ? `${c.wins} win${c.wins > 1 ? "s" : ""}` : "No wins yet"}</span>
                 </span>
               </span>

@@ -30,7 +30,7 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
 }
 
 // Settings that are synced to the account (everything except purely local state).
-const SYNCED: (keyof Settings)[] = ["theme", "teamAccent", "favouriteDriver", "favouriteTeamColour", "spoilerFree", "sounds", "alerts", "flagEffects", "reminders", "reminderMinutes", "livePanels"];
+const SYNCED: (keyof Settings)[] = ["theme", "teamAccent", "favouriteDriver", "favouriteTeamColour", "spoilerFree", "sounds", "alerts", "flagEffects", "reminders", "reminderMinutes", "livePanels", "colourBlind", "reduceMotion", "language"];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

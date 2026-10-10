@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useState } from "react";
-import { BarChart3, CalendarDays, History, Radio, Settings2, Ticket, Trophy } from "lucide-react";
+import { BarChart3, CalendarDays, History, Newspaper, Radio, Settings2, Ticket, Trophy } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { clerkEnabled } from "@/lib/clerk";
 import { Points } from "@/components/account/Avatar";
@@ -11,6 +11,7 @@ import { HeaderAuth } from "@/components/account/ClerkControls";
 import { useLive } from "@/lib/live-context";
 import { sessionIsActive } from "@/lib/live";
 import { cn } from "@/components/ui";
+import { useT } from "@/lib/i18n";
 import { SettingsSheet } from "./SettingsSheet";
 import { LiveOverlays } from "@/components/live/LiveOverlays";
 import { Reminders } from "./Reminders";
@@ -22,6 +23,7 @@ const NAV = [
   { href: "/play", label: "Play", icon: Ticket },
   { href: "/stats", label: "Stats", icon: BarChart3 },
   { href: "/replay", label: "Replay", icon: History },
+  { href: "/news", label: "News", icon: Newspaper, desktopOnly: true },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -29,11 +31,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { topics, connection } = useLive();
   const live = sessionIsActive(topics, connection);
   const { user } = useAuth();
+  const t = useT();
 
   return (
     <div className="flex min-h-dvh flex-col">
       <a href="#main" className="sr-only z-50 rounded-xl bg-accent px-4 py-2 font-semibold text-accent-ink focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
-        Skip to content
+        {t("Skip to content")}
       </a>
       <header className="sticky top-0 z-40 border-b border-line bg-bg/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-[1500px] items-center gap-6 px-4">
@@ -51,7 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="ml-auto flex items-center gap-2">
             {live && (
               <Link href="/live" title="Open the race centre" className="flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-accent-ink shadow-card hover:opacity-90">
-                <span className="live-dot h-1.5 w-1.5 rounded-full bg-accent-ink" /> LIVE<span className="hidden sm:inline"> · Race centre</span>
+                <span className="live-dot h-1.5 w-1.5 rounded-full bg-accent-ink" /> LIVE<span className="hidden sm:inline"> · {t("Race centre")}</span>
               </Link>
             )}
             {clerkEnabled ? (
@@ -64,7 +67,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               />
             ) : (
               <Link href="/sign-in" className="rounded-xl px-3 py-1.5 text-sm font-semibold text-muted hover:text-ink">
-                Sign in
+                {t("Sign in")}
               </Link>
             )}
             <button
@@ -102,6 +105,7 @@ function ActiveNavLinks(props: { live: boolean; variant: "top" | "bottom" }) {
 }
 
 function NavLinks({ live, variant, pathname }: { live: boolean; variant: "top" | "bottom"; pathname: string | null }) {
+  const t = useT();
   const active = (href: string) => pathname != null && (href === "/" ? pathname === "/" || pathname === "/live" : pathname.startsWith(href));
   if (variant === "top") {
     return (
@@ -116,7 +120,7 @@ function NavLinks({ live, variant, pathname }: { live: boolean; variant: "top" |
             )}
           >
             <Icon size={16} />
-            {label}
+            {t(label)}
             {href === "/" && live && <span className="live-dot h-1.5 w-1.5 rounded-full bg-accent" />}
           </Link>
         ))}
@@ -125,7 +129,7 @@ function NavLinks({ live, variant, pathname }: { live: boolean; variant: "top" |
   }
   return (
     <>
-      {NAV.map(({ href, label, icon: Icon }) => (
+      {NAV.filter((n) => !n.desktopOnly).map(({ href, label, icon: Icon }) => (
         <Link
           key={href}
           href={href}
@@ -135,7 +139,7 @@ function NavLinks({ live, variant, pathname }: { live: boolean; variant: "top" |
             <Icon size={20} />
             {href === "/" && live && <span className="live-dot absolute -top-0.5 -right-1 h-2 w-2 rounded-full bg-accent" />}
           </span>
-          {label}
+          {t(label)}
         </Link>
       ))}
     </>

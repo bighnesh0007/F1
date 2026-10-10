@@ -1,13 +1,15 @@
 "use client";
 
-import { Accessibility, ArrowDown, ArrowUp, Bell, Eye, EyeOff, Moon, Palette, Star, Sun, Monitor, Volume2, Zap, LayoutGrid } from "lucide-react";
+import { Languages, Accessibility, ArrowDown, ArrowUp, Bell, Eye, EyeOff, Moon, Palette, Star, Sun, Monitor, Volume2, Zap, LayoutGrid } from "lucide-react";
 import { useSettings, type LivePanel } from "@/lib/settings";
+import { LANGUAGES, type Lang, useT } from "@/lib/i18n";
 import { useDrivers } from "@/lib/drivers";
 import { sounds } from "@/lib/sound";
 import { timeZoneName } from "@/lib/format";
 import { Segmented, Sheet, TeamBar, cn } from "@/components/ui";
 import { Section, Toggle } from "./Toggle";
 import { PushSettings } from "./PushSettings";
+import { InstallApp } from "./InstallApp";
 import { useNow } from "@/lib/useNow";
 
 const PANEL_LABELS: Record<LivePanel, string> = {
@@ -31,6 +33,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
     update({ livePanels: panels });
   };
 
+  const t = useT();
   const requestReminders = async (on: boolean) => {
     if (on && "Notification" in window && Notification.permission !== "granted") {
       const result = await Notification.requestPermission();
@@ -40,7 +43,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="Settings">
+    <Sheet open={open} onClose={onClose} title={t("Settings")}>
       <div className="space-y-7">
         <Section icon={<Star size={16} />} title="Favourite driver" hint="Highlighted everywhere, and their team colour can theme the app.">
           <div className="grid max-h-64 grid-cols-2 gap-1.5 overflow-y-auto pr-1 scroll-thin">
@@ -68,14 +71,22 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         </Section>
 
+        <Section icon={<Languages size={16} />} title="Language">
+          <Segmented
+            value={settings.language}
+            onChange={(language) => update({ language })}
+            options={(Object.keys(LANGUAGES) as Lang[]).map((l) => ({ value: l, label: <span lang={l}>{LANGUAGES[l]}</span> }))}
+          />
+        </Section>
+
         <Section icon={<Palette size={16} />} title="Appearance">
           <Segmented
             value={settings.theme}
             onChange={(theme) => update({ theme })}
             options={[
-              { value: "system", label: <span className="flex items-center gap-1.5"><Monitor size={14} /> Auto</span> },
-              { value: "dark", label: <span className="flex items-center gap-1.5"><Moon size={14} /> Dark</span> },
-              { value: "light", label: <span className="flex items-center gap-1.5"><Sun size={14} /> Light</span> },
+              { value: "system", label: <span className="flex items-center gap-1.5"><Monitor size={14} /> {t("Auto")}</span> },
+              { value: "dark", label: <span className="flex items-center gap-1.5"><Moon size={14} /> {t("Dark")}</span> },
+              { value: "light", label: <span className="flex items-center gap-1.5"><Sun size={14} /> {t("Light")}</span> },
             ]}
           />
           <Toggle
@@ -119,6 +130,8 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
             }}
           />
         </Section>
+
+        <InstallApp />
 
         <PushSettings />
 

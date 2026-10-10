@@ -149,3 +149,28 @@ export type Replay = {
   trackStatus: [number, string, string][];
   raceControl: { t: number; message: string; flag: string | null; category: string; lap: number | null }[];
 };
+
+export type DriverCareer = {
+  driver: { id: string; code?: string; name: string; nationality: string; number: string | null; dateOfBirth: string | null; url: string | null };
+  totals: { seasons: number; races: number; wins: number; podiums: number; poles: number; points: number; dnfs: number; titles: number; titleYears: number[]; firstRace: { season: number; name: string } | null; firstWin: { season: number; name: string } | null };
+  seasons: { season: number; teams: string[]; races: number; wins: number; podiums: number; points: number; best: number | null }[];
+  recent: { season: number; round: number; name: string; position: number; positionText: string; grid: number; team: string; points: number; status: string }[];
+};
+
+export type TeamHistory = {
+  team: { id: string; name: string; nationality: string; url: string | null };
+  totals: { seasons: number; firstSeason: number | null; wins: number; poles: number; titles: number; titleYears: number[]; lastWin: { season: number; name: string; driver: { name: string } } | null };
+  topWinners: { id: string; name: string; count: number }[];
+  winsBySeason: { season: number; wins: number }[];
+};
+
+export type NewsItem = { title: string; summary: string; link: string; image: string | null; source: string; publishedAt: string | null };
+
+export type Trip = {
+  timezone: string | null;
+  utcOffsetSeconds: number | null;
+  sunrise: string | null;
+  sunset: string | null;
+  forecast: { maxTemp: number; minTemp: number; rainChance: number | null; code: number | null } | null;
+  climate: { years: number; maxTemp: number; minTemp: number; rainyYears: number } | null;
+};

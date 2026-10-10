@@ -15,6 +15,8 @@ import { CalendarMenu } from "./CalendarMenu";
 import type { Race, RaceDetail, Result } from "@/lib/types";
 import { Card, Countdown, ErrorNote, Skeleton, Spoiler, TeamBar, cn } from "@/components/ui";
 import { CircuitGuide } from "./CircuitGuide";
+import { TripCard } from "./TripCard";
+import { AiRecap } from "@/components/ai/AiRecap";
 import { SessionList } from "./SessionList";
 import { Podium } from "./Podium";
 
@@ -61,6 +63,11 @@ export function RoundView() {
         </div>
       </section>
 
+      {done && (
+        <Spoiler label="Race recap hidden">
+          <AiRecap season={race.season} round={race.round} />
+        </Spoiler>
+      )}
       {done && <RaceSummary season={race.season} round={race.round} />}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
@@ -74,6 +81,7 @@ export function RoundView() {
         </Card>
         <CircuitGuide circuit={race.circuit} />
       </div>
+      {!done && <TripCard lat={race.circuit.lat} lon={race.circuit.lon} date={race.date} name={race.circuit.name} />}
     </div>
   );
 }

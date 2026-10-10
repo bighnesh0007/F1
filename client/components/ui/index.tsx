@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { EyeOff, X } from "lucide-react";
+import { useT } from "@/lib/i18n";
 import { TYRES } from "@/lib/live";
 import { countdownParts } from "@/lib/format";
 import { useNow } from "@/lib/useNow";
@@ -27,13 +28,14 @@ export function Card({
   className?: string;
   bodyClassName?: string;
 }) {
+  const t = useT();
   return (
     <section className={cn("rounded-2xl border border-line bg-surface shadow-card", className)}>
       {(title || right) && (
         <header className="flex items-center justify-between gap-3 px-4 pt-3.5 pb-2">
           <h2 className="flex items-center gap-2 text-[13px] font-semibold text-muted">
             {icon && <span className="text-faint">{icon}</span>}
-            {title}
+            {typeof title === "string" ? t(title) : title}
           </h2>
           {right}
         </header>
@@ -62,6 +64,7 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void;
   size?: "sm" | "md";
 }) {
+  const t = useT();
   return (
     <div role="tablist" className="inline-flex rounded-xl bg-surface-2 p-1">
       {options.map((o) => (
@@ -79,7 +82,7 @@ export function Segmented<T extends string>({
           {o.value === value && (
             <motion.span layoutId={`seg-${options.map((x) => x.value).join("")}`} className="absolute inset-0 rounded-lg bg-surface shadow-card" transition={{ type: "spring", bounce: 0.2, duration: 0.4 }} />
           )}
-          <span className="relative">{o.label}</span>
+          <span className="relative">{typeof o.label === "string" ? t(o.label) : o.label}</span>
         </button>
       ))}
     </div>

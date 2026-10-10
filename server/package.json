@@ -13,6 +13,7 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "@clerk/express": "^2.1.78",
     "@microsoft/signalr": "^10.0.11",
     "compression": "^1.8.2",

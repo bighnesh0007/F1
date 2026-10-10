@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { PictureInPicture2 } from "lucide-react";
@@ -12,6 +13,7 @@ type DocumentPip = { requestWindow: (o: { width: number; height: number }) => Pr
 // Pops the timing out into a small always-on-top window (Document Picture-in-Picture,
 // Chrome and Edge), to keep over a TV stream. Other browsers get a small popup window.
 export function PopOutButton() {
+  const t = useT();
   const [pip, setPip] = useState<PipWindow | null>(null);
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export function PopOutButton() {
         className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-ink"
         title="Keep the timing in a small floating window"
       >
-        <PictureInPicture2 size={14} /> {pip ? "Close pop-out" : "Pop out"}
+        <PictureInPicture2 size={14} /> {pip ? "Close pop-out" : t("Pop out")}
       </button>
       {pip && createPortal(<MiniTiming />, pip.document.body)}
     </>

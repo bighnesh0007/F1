@@ -18,6 +18,9 @@ import { chatRouter, startChat } from './chat.js';
 import { pollsRouter } from './polls.js';
 import { fantasyRouter } from './fantasy.js';
 import { getQuiz, quizRouter } from './quiz.js';
+import { searchNews } from './news.js';
+import { getTrip } from './trip.js';
+import { aiRouter } from './ai.js';
 import { socialRouter } from './social.js';
 
 const PORT = Number(process.env.PORT) || 4000;
@@ -72,6 +75,7 @@ app.use('/api/game', gameRouter(requireUser));
 app.use('/api/chat', chatRouter(requireUser));
 app.use('/api/polls', pollsRouter(live));
 app.use('/api', socialRouter(requireUser, live));
+app.use('/api/ai', aiRouter(live));
 app.use('/api/calendar', calendarRouter(requireUser));
 app.use('/api/push', pushRouter());
 
@@ -120,6 +124,19 @@ app.get('/api/records', route(() => jolpica.getRecords()));
 app.get('/api/season-summary/:year', route((req) => jolpica.getSeasonSummary(Number(req.params.year))));
 app.get('/api/race/:year/:round', route((req) => jolpica.getRace(Number(req.params.year), Number(req.params.round))));
 app.get('/api/circuit-history/:circuitId', route((req) => jolpica.getCircuitHistory(req.params.circuitId)));
+app.get('/api/news', route((req) => searchNews(req.query.q)));
+app.get(
+  '/api/trip',
+  route((req) => {
+    const lat = Number(req.query.lat);
+    const lon = Number(req.query.lon);
+    const date = String(req.query.date ?? '');
+    if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180 || isNaN(Date.parse(date))) throw Object.assign(new Error('lat, lon and date are required'), { status: 400 });
+    return getTrip(lat, lon, new Date(date).toISOString());
+  }),
+);
+app.get('/api/driver/:id', route((req) => jolpica.getDriverCareer(req.params.id)));
+app.get('/api/team/:id', route((req) => jolpica.getTeamHistory(req.params.id)));
 
 // The race weekend happening now, or the next one, plus the previous race.
 app.get(

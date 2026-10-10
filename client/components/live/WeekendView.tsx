@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n";
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, Bell, BellRing, CalendarDays, CloudSun, Flag, Trophy } from "lucide-react";
@@ -15,6 +16,8 @@ import { CircuitGuide, useCircuitMap } from "@/components/race/CircuitGuide";
 import { SessionList } from "@/components/race/SessionList";
 import { Podium } from "@/components/race/Podium";
 import { CalendarMenu } from "@/components/race/CalendarMenu";
+import { TripCard } from "@/components/race/TripCard";
+import { TeamNews } from "@/components/news/NewsView";
 
 export function WeekendView() {
   const { data, error } = useApi<Weekend>("/api/weekend", { refreshMs: 10 * 60_000 });
@@ -46,6 +49,7 @@ export function WeekendView() {
               <CalendarMenu race={race} />
             </div>
           </Card>
+          <TripCard lat={race.circuit.lat} lon={race.circuit.lon} date={race.date} name={race.circuit.name} />
           <RadarCard lat={race.circuit.lat} lon={race.circuit.lon} />
         </div>
         <CircuitGuide circuit={race.circuit} circuitKey={race.circuitKey} />
@@ -54,11 +58,13 @@ export function WeekendView() {
         {data.previous && <LastRace season={data.previous.season} round={data.previous.round} />}
         <ChampionshipSnapshot />
       </div>
+      <TeamNews />
     </div>
   );
 }
 
 function Hero({ race, nextSession, totalRounds }: { race: NonNullable<Weekend["current"]>; nextSession: { name: string; start: string } | null; totalRounds: number }) {
+  const t = useT();
   const { data: map } = useCircuitMap(race.circuit, race.circuitKey);
   const first = race.sessions[0]?.start ?? race.date;
   return (
@@ -71,8 +77,8 @@ function Hero({ race, nextSession, totalRounds }: { race: NonNullable<Weekend["c
       )}
       <div className="relative max-w-2xl">
         <p className="flex items-center gap-2 text-sm font-semibold text-muted">
-          <Flag size={14} className="text-accent" /> Round {race.round} of {totalRounds}
-          {race.sprint && <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-ink">Sprint weekend</span>}
+          <Flag size={14} className="text-accent" /> {t("Round")} {race.round} {t("of")} {totalRounds}
+          {race.sprint && <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-ink">{t("Sprint weekend")}</span>}
         </p>
         <h1 className="mt-1 font-display text-3xl leading-tight font-bold sm:text-5xl">
           <span className="mr-2">{countryFlag(race.circuit.country)}</span>
@@ -84,7 +90,7 @@ function Hero({ race, nextSession, totalRounds }: { race: NonNullable<Weekend["c
         {nextSession ? (
           <div className="mt-6">
             <p className="mb-2 text-sm font-medium">
-              <span className="text-accent">Up next:</span> {nextSession.name} · {localDay(nextSession.start)}, {localTime(nextSession.start)}
+              <span className="text-accent">{t("Up next:")}</span> {nextSession.name} · {localDay(nextSession.start)}, {localTime(nextSession.start)}
             </p>
             <Countdown to={nextSession.start} />
           </div>
@@ -134,6 +140,7 @@ function RadarCard({ lat, lon }: { lat: number; lon: number }) {
 }
 
 function LastRace({ season, round }: { season: number; round: number }) {
+  const t = useT();
   const { data, error } = useApi<RaceDetail>(`/api/race/${season}/${round}`);
   return (
     <Card
@@ -141,7 +148,7 @@ function LastRace({ season, round }: { season: number; round: number }) {
       icon={<Flag size={15} />}
       right={
         <Link href={`/schedule/${round}?year=${season}`} className="flex items-center gap-1 text-xs font-semibold text-accent">
-          Full summary <ArrowRight size={13} />
+          {t("Full summary")} <ArrowRight size={13} />
         </Link>
       }
     >
@@ -164,6 +171,7 @@ function LastRace({ season, round }: { season: number; round: number }) {
 }
 
 function ChampionshipSnapshot() {
+  const t = useT();
   const { data, error } = useApi<Standings>("/api/standings");
   const { byCode } = useDrivers();
   const teamColour = useTeamColour();
@@ -174,7 +182,7 @@ function ChampionshipSnapshot() {
       icon={<Trophy size={15} />}
       right={
         <Link href="/standings" className="flex items-center gap-1 text-xs font-semibold text-accent">
-          All standings <ArrowRight size={13} />
+          {t("All standings")} <ArrowRight size={13} />
         </Link>
       }
     >

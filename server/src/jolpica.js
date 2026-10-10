@@ -283,6 +283,16 @@ async function championOf(year) {
   });
 }
 
+// Constructors' champion of a season (the championship started in 1958).
+const constructorChampions = new Map();
+async function constructorChampionOf(year) {
+  return cached(`constructorChampion:${year}`, 30 * DAY, async () => {
+    const data = await request(`${year}/constructorStandings/1.json`);
+    const s = data.MRData.StandingsTable.StandingsLists[0]?.ConstructorStandings?.[0];
+    return s ? { season: year, id: s.Constructor.constructorId, name: s.Constructor.name, points: Number(s.points) } : null;
+  });
+}
+
 // Fills in every finished season (newest first). Runs in the background.
 export function warmChampions() {
   warming ??= (async () => {
@@ -294,6 +304,15 @@ export function warmChampions() {
         if (c) champions.set(year, c);
       } catch (err) {
         console.error(`Champion ${year}:`, err.message);
+      }
+    }
+    for (let year = last; year >= 1958; year--) {
+      if (constructorChampions.has(year)) continue;
+      try {
+        const c = await constructorChampionOf(year);
+        if (c) constructorChampions.set(year, c);
+      } catch (err) {
+        console.error(`Constructors' champion ${year}:`, err.message);
       }
     }
   })().finally(() => {
@@ -374,4 +393,106 @@ function countBy(list, keyOf, itemOf) {
 function toSeconds(time) {
   const [m, s] = time.includes(':') ? time.split(':') : ['0', time];
   return Number(m) * 60 + Number(s);
+}
+
+// --- Driver and team careers ------------------------------------------------------
+
+const ID = /^[a-z0-9_]+$/;
+const classified = (status) => /finished|lap/i.test(status ?? '');
+
+// A driver's career from every race result: seasons, teams, wins, podiums, poles,
+// points, titles, and their latest races.
+export function getDriverCareer(id) {
+  if (!ID.test(id)) return Promise.resolve(null);
+  return cached(`driverCareer:${id}`, 6 * HOUR, async () => {
+    const info = await request(`drivers/${id}.json`);
+    const d = info.MRData.DriverTable.Drivers[0];
+    if (!d) return null;
+    const [results, sprints, poles] = await Promise.all([
+      races(`drivers/${id}/results.json`, 'Results'),
+      races(`drivers/${id}/sprint.json`, 'SprintResults').catch(() => []),
+      races(`drivers/${id}/qualifying/1.json`, 'QualifyingResults').catch(() => []),
+    ]);
+    const rows = results
+      .map((r) => ({ season: Number(r.season), round: Number(r.round), name: r.raceName, date: r.date, ...raceResult(r.Results[0]) }))
+      .sort((a, b) => a.season - b.season || a.round - b.round);
+    const sprintPoints = new Map();
+    for (const r of sprints) sprintPoints.set(Number(r.season), (sprintPoints.get(Number(r.season)) ?? 0) + Number(r.SprintResults[0]?.points ?? 0));
+
+    const seasons = new Map();
+    for (const r of rows) {
+      const s = seasons.get(r.season) ?? { season: r.season, teams: [], races: 0, wins: 0, podiums: 0, points: 0, best: null };
+      if (!s.teams.includes(r.team)) s.teams.push(r.team);
+      s.races++;
+      if (r.position === 1) s.wins++;
+      if (r.position <= 3) s.podiums++;
+      s.points += r.points;
+      if (classified(r.status) && (s.best == null || r.position < s.best)) s.best = r.position;
+      seasons.set(r.season, s);
+    }
+    for (const [year, pts] of sprintPoints) if (seasons.has(year)) seasons.get(year).points += pts;
+    const titleYears = [];
+    for (const year of seasons.keys()) {
+      const c = champions.get(year) ?? (year < new Date().getUTCFullYear() ? await championOf(year).catch(() => null) : null);
+      if (c?.driver.id === id) titleYears.push(year);
+    }
+
+    return {
+      driver: driver(d, { number: d.permanentNumber ?? null, dateOfBirth: d.dateOfBirth ?? null, url: d.url ?? null }),
+      totals: {
+        seasons: seasons.size,
+        races: rows.length,
+        wins: rows.filter((r) => r.position === 1).length,
+        podiums: rows.filter((r) => r.position <= 3).length,
+        poles: poles.length,
+        points: Math.round([...seasons.values()].reduce((s, x) => s + x.points, 0) * 10) / 10,
+        dnfs: rows.filter((r) => !classified(r.status)).length,
+        titles: titleYears.length,
+        titleYears,
+        firstRace: rows[0] ? { season: rows[0].season, name: rows[0].name } : null,
+        firstWin: rows.find((r) => r.position === 1) ?? null,
+      },
+      seasons: [...seasons.values()].sort((a, b) => b.season - a.season).map((s) => ({ ...s, points: Math.round(s.points * 10) / 10 })),
+      recent: rows.slice(-10).reverse().map((r) => ({ season: r.season, round: r.round, name: r.name, position: r.position, positionText: r.positionText, grid: r.grid, team: r.team, points: r.points, status: r.status })),
+    };
+  });
+}
+
+// A team's history: titles, wins, poles, seasons and drivers.
+export function getTeamHistory(id) {
+  if (!ID.test(id)) return Promise.resolve(null);
+  return cached(`teamHistory:${id}`, 6 * HOUR, async () => {
+    const info = await request(`constructors/${id}.json`);
+    const c = info.MRData.ConstructorTable.Constructors[0];
+    if (!c) return null;
+    const [wins, poles, seasonsData] = await Promise.all([
+      races(`constructors/${id}/results/1.json`, 'Results').catch(() => []),
+      races(`constructors/${id}/qualifying/1.json`, 'QualifyingResults').catch(() => []),
+      allPages(`constructors/${id}/seasons.json`).catch(() => []),
+    ]);
+    const seasons = seasonsData.flatMap((p) => p.SeasonTable?.Seasons ?? []).map((x) => Number(x.season));
+    const titleYears = [];
+    for (const year of seasons) {
+      if (year < 1958 || year >= new Date().getUTCFullYear()) continue;
+      const champ = constructorChampions.get(year) ?? (await constructorChampionOf(year).catch(() => null));
+      if (champ?.id === id) titleYears.push(year);
+    }
+    const winList = wins.map((r) => ({ season: Number(r.season), round: Number(r.round), name: r.raceName, driver: driver(r.Results[0].Driver) }));
+    return {
+      team: { id: c.constructorId, name: c.name, nationality: c.nationality, url: c.url ?? null },
+      totals: {
+        seasons: seasons.length,
+        firstSeason: seasons.length ? Math.min(...seasons) : null,
+        wins: winList.length,
+        poles: poles.length,
+        titles: titleYears.length,
+        titleYears,
+        lastWin: winList.sort((a, b) => b.season - a.season || b.round - a.round)[0] ?? null,
+      },
+      topWinners: countBy(winList, (w) => w.driver.id, (w) => w.driver).slice(0, 8),
+      winsBySeason: Object.entries(winList.reduce((m, w) => ((m[w.season] = (m[w.season] ?? 0) + 1), m), {}))
+        .map(([season, n]) => ({ season: Number(season), wins: n }))
+        .sort((a, b) => a.season - b.season),
+    };
+  });
 }

@@ -57,6 +57,18 @@ All configuration lives in one file: copy `.env.example` to `.env` in the projec
 
 **Friends and achievements**: follow other fans, rank against them, and see their calls once they lock. Badges for streaks (predicting weekends in a row), quizzes, fantasy, watching live sessions, hosting watch parties and more. **Share cards**: share a correct call or your profile as a picture card on social media.
 
+**Driver and team pages**: every driver's and team's career from the full results history: titles, wins, podiums, poles, points by season, season-by-season tables and their latest races (linked from the standings).
+
+**News**: headlines from Formula1.com, Autosport, Motorsport.com and The Race, filterable by team, on the home page, driver and team pages. Articles open on the publisher's site.
+
+**Going to the race**: time at the track vs. yours, sunrise and sunset, the race-day forecast (or typical weather from the last five years), plus ticket and directions links.
+
+**AI race analyst** (with an Anthropic API key): a written recap of each finished race, "Catch me up" during live sessions, and questions like "why did Hamilton pit?" answered from the live timing data, in the race centre's Ask AI tab.
+
+**Languages**: English, Hindi and Spanish (Settings → Language; follows your browser's language by default). The main screens are translated; anything not yet translated shows in English.
+
+**Installable app**: install from the browser (Settings → App), with home-screen shortcuts to the race centre, Play, Schedule and News. See below for publishing to app stores.
+
 **Calendar**: add a weekend or the whole season to Google Calendar in one tap, open any race in Google Calendar without an account, download an .ics for Apple/Outlook, or subscribe to a season feed that updates itself. **Watch parties** create a Google Calendar event with your friends invited and a Google Meet link.
 
 **Settings**: favourite driver (highlighted everywhere, optional team-colour theme), dark/light theme, spoiler-free mode, alerts, flag effects, sounds, reminders, and which live panels show in what order. Installable as an app on phones and desktops.
@@ -158,6 +170,9 @@ server/   Node.js + Express                                 → http://localhost
   src/push.js         push notifications
   src/transcribe.js   team radio transcripts
   src/observe.js      request logs, browser error reports, metrics
+  src/ai.js           AI race analyst (Claude)
+  src/news.js         news feeds
+  src/trip.js         time zone, daylight and weather for race trips
   src/calendar.js     season .ics feed, Google Calendar sync, watch parties
   src/db/             Redis and MongoDB connections
 docker-compose.yml
@@ -185,6 +200,24 @@ TRANSCRIBE_MODEL=whisper-1
 ```
 
 Each clip is transcribed once and cached for 30 days.
+
+**AI race analyst.** Uses Claude (Anthropic's API):
+
+```
+ANTHROPIC_API_KEY=...
+AI_MODEL=claude-opus-5-5   # optional
+```
+
+If Claude's safety checks decline a request, the API automatically retries it on a fallback model (`AI_FALLBACKS=off` to disable). Recaps are written once per race and cached; questions are limited to 20 per user per hour and need sign-in when Clerk is set up.
+
+**News feeds.** `NEWS_FEEDS` (comma-separated RSS URLs) replaces the default list.
+
+### Publishing to app stores
+
+F1 Live is a Progressive Web App, so the same site can be wrapped as a store app:
+
+- **Google Play**: build a Trusted Web Activity with [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap) or [PWABuilder](https://www.pwabuilder.com/) from `https://your-domain/manifest.webmanifest`, then set `ANDROID_PACKAGE_NAME` and `ANDROID_CERT_SHA256` so `/.well-known/assetlinks.json` verifies the app (no browser bar).
+- **iOS App Store**: PWABuilder can generate an iOS wrapper project; people can also simply "Add to Home Screen" in Safari.
 
 ## Tests and monitoring
 
@@ -248,4 +281,8 @@ Both read the root `.env`. The client reads `SERVER_URL` (default `http://localh
 | `GET /api/polls/live`, `POST /api/polls/:kind/vote` | Fan polls during races |
 | `POST/DELETE /api/users/:handle/follow`, `GET /api/friends`, `/friends/leaderboard`, `/friends/feed` | Friends |
 | `POST /api/push/subscribe`, `/unsubscribe`, `GET /api/push/key` | Push notifications |
+| `GET /api/driver/:id`, `GET /api/team/:id` | Driver career, team history |
+| `GET /api/news?q=` | News headlines (optionally matching words) |
+| `GET /api/trip?lat=&lon=&date=` | Time zone, daylight and weather for a race |
+| `GET /api/ai/status`, `/api/ai/recap/:season/:round`, `/api/ai/catch-up`; `POST /api/ai/ask` | AI analyst |
 | `POST /api/calendar/google/sync`, `/google/watch-party` | Google Calendar sync and watch parties |

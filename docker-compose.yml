@@ -20,6 +20,9 @@ services:
       TRANSCRIBE_URL: ${TRANSCRIBE_URL:-}
       TRANSCRIBE_API_KEY: ${TRANSCRIBE_API_KEY:-}
       TRANSCRIBE_MODEL: ${TRANSCRIBE_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      NEWS_FEEDS: ${NEWS_FEEDS:-}
       # Optional F1 TV token for live car positions.
       F1_AUTH_TOKEN: ${F1_AUTH_TOKEN:-}
     ports:
@@ -47,6 +50,8 @@ services:
       SERVER_URL: http://server:4000
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      ANDROID_PACKAGE_NAME: ${ANDROID_PACKAGE_NAME:-}
+      ANDROID_CERT_SHA256: ${ANDROID_CERT_SHA256:-}
     ports:
       - "3000:3000"
     depends_on:

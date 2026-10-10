@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -28,6 +29,7 @@ const TITLES: Record<Mode, { title: string; text: string }> = {
 };
 
 export function PlayView() {
+  const t = useT();
   const { user } = useAuth();
   const { data: weekend, error } = useApi<Weekend>("/api/weekend");
   const race = weekend?.current;
@@ -79,12 +81,12 @@ export function PlayView() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-bold">{TITLES[mode].title}</h1>
-          <p className="text-sm text-muted">{TITLES[mode].text}</p>
+          <h1 className="font-display text-3xl font-bold">{t(TITLES[mode].title)}</h1>
+          <p className="text-sm text-muted">{t(TITLES[mode].text)}</p>
         </div>
         {user ? (
           <div className="rounded-2xl border border-line bg-surface px-4 py-2 shadow-card">
-            <p className="text-[11px] font-semibold text-muted">Your points</p>
+            <p className="text-[11px] font-semibold text-muted">{t("Your points")}</p>
             <Points value={user.points} className="text-lg" />
           </div>
         ) : clerkEnabled ? (
@@ -97,9 +99,9 @@ export function PlayView() {
           value={mode}
           onChange={setMode}
           options={[
-            { value: "predict", label: <span className="flex items-center justify-center gap-1.5"><Target size={14} /> Predict</span> },
-            { value: "fantasy", label: <span className="flex items-center justify-center gap-1.5"><Users size={14} /> Fantasy</span> },
-            { value: "quiz", label: <span className="flex items-center justify-center gap-1.5"><Brain size={14} /> Quiz</span> },
+            { value: "predict", label: <span className="flex items-center justify-center gap-1.5"><Target size={14} /> {t("Predict")}</span> },
+            { value: "fantasy", label: <span className="flex items-center justify-center gap-1.5"><Users size={14} /> {t("Fantasy")}</span> },
+            { value: "quiz", label: <span className="flex items-center justify-center gap-1.5"><Brain size={14} /> {t("Quiz")}</span> },
           ]}
         />
       </div>

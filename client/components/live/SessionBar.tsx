@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n";
 import { CloudRain, Droplets, Thermometer, Timer, Wind, WifiOff } from "lucide-react";
 import { useLive } from "@/lib/live-context";
 import { TRACK_STATUS } from "@/lib/live";
@@ -15,6 +16,7 @@ const TONES = {
 };
 
 export function SessionBar({ action }: { action?: React.ReactNode }) {
+  const t = useT();
   const { topics, connection, streamOpen, staleSince } = useLive();
   const info = topics.SessionInfo;
   const track = TRACK_STATUS[String(topics.TrackStatus?.Status)];
@@ -35,7 +37,7 @@ export function SessionBar({ action }: { action?: React.ReactNode }) {
         <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">
           <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-muted uppercase">
             {live ? (
-              <span className="flex items-center gap-1.5 text-accent"><span className="live-dot h-1.5 w-1.5 rounded-full bg-accent" />Live</span>
+              <span className="flex items-center gap-1.5 text-accent"><span className="live-dot h-1.5 w-1.5 rounded-full bg-accent" />{t("Live")}</span>
             ) : (
               <span>{streamOpen ? "Reconnecting" : "Offline"}</span>
             )}
@@ -51,7 +53,7 @@ export function SessionBar({ action }: { action?: React.ReactNode }) {
 
         <div className="flex flex-wrap items-center gap-2.5">
           {lap?.CurrentLap != null && (
-            <Stat label="Lap">
+            <Stat label={t("Lap")}>
               {lap.CurrentLap}
               {lap.TotalLaps ? <span className="text-muted">/{lap.TotalLaps}</span> : null}
             </Stat>
@@ -92,6 +94,7 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
 
 // ExtrapolatedClock gives the remaining time at a moment; count down from it locally.
 function Clock() {
+  const t = useT();
   const { topics, feedNow, staleSince } = useLive();
   const now = useNow(1000);
   const clock = topics.ExtrapolatedClock;
@@ -103,7 +106,7 @@ function Clock() {
   const total = Math.max(0, Math.round(remaining / 1000));
   const text = `${Math.floor(total / 3600)}:${String(Math.floor((total % 3600) / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
   return (
-    <Stat label="Remaining">
+    <Stat label={t("Remaining")}>
       <span className="flex items-center gap-1"><Timer size={14} className="text-faint" />{text}</span>
     </Stat>
   );

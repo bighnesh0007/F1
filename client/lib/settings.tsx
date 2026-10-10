@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { detectLanguage } from "./lang";
 
 export type LivePanel = "battles" | "feed" | "weather" | "radio";
 
@@ -22,6 +23,7 @@ export type Settings = {
   pushSessions: boolean;
   pushFlags: boolean;
   pushDriver: boolean;
+  language: "en" | "hi" | "es";
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -46,6 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
   pushSessions: false,
   pushFlags: false,
   pushDriver: false,
+  language: "en",
 };
 
 const STORAGE_KEY = "f1live.settings";
@@ -61,7 +64,7 @@ const SettingsContext = createContext<Ctx>({ settings: DEFAULT_SETTINGS, update:
 function load(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
+    if (!raw) return { ...DEFAULT_SETTINGS, language: detectLanguage() };
     const saved = JSON.parse(raw);
     // Keep newly added panels when merging older saved settings.
     const panels = [...(saved.livePanels ?? [])].filter((p: { id: LivePanel }) =>
@@ -110,6 +113,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     root.toggleAttribute("data-cb", settings.colourBlind);
     root.toggleAttribute("data-reduce-motion", settings.reduceMotion);
   }, [settings.colourBlind, settings.reduceMotion]);
+
+  useEffect(() => {
+    document.documentElement.lang = settings.language;
+  }, [settings.language]);
 
   useEffect(() => {
     const root = document.documentElement;

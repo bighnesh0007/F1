@@ -1,10 +1,12 @@
 "use client";
 
+import { useT } from "@/lib/i18n";
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, Flag, History, Map as MapIcon, MessageCircle, Radio, Timer, Trophy, Tv } from "lucide-react";
+import { ArrowLeft, Flag, History, Map as MapIcon, MessageCircle, Radio, Sparkles, Timer, Trophy, Tv } from "lucide-react";
 import { useLive } from "@/lib/live-context";
 import { useSettings } from "@/lib/settings";
+import { useDrivers } from "@/lib/drivers";
 import { useApi } from "@/lib/useApi";
 import { useNow } from "@/lib/useNow";
 import { useMedia } from "@/lib/useMedia";
@@ -21,6 +23,7 @@ import { LatestMessageBanner, RaceControlList, useRaceControl } from "./RaceCont
 import { RadioPlayer } from "./RadioPlayer";
 import { PopOutButton } from "./PopOut";
 import { Chat } from "./Chat";
+import { AskAnalyst } from "./AskAnalyst";
 import { LivePolls } from "./LivePolls";
 import { useWatchedCheckIn } from "./checkin";
 import { DriverFocus } from "./DriverFocus";
@@ -30,14 +33,16 @@ import { LiveChampionship, PitStops } from "./PitsAndTitle";
 const Insights = dynamic(() => import("@/components/live/Insights").then((m) => m.Insights));
 const DriverSheet = dynamic(() => import("@/components/live/DriverSheet").then((m) => m.DriverSheet));
 
-type SideTab = "control" | "radio" | "chat" | "pits" | "title";
-type MobileTab = "track" | "timing" | "driver" | "charts" | "control" | "radio" | "chat";
+type SideTab = "control" | "radio" | "chat" | "ask" | "pits" | "title";
+type MobileTab = "track" | "timing" | "driver" | "charts" | "control" | "radio" | "chat" | "ask";
 
 // A full view of one live session: big map, timing, race control, team radio, a
 // driver to follow, pit stops and the live championship.
 export function RaceCentre() {
+  const t = useT();
   const { topics, connection } = useLive();
   const { settings } = useSettings();
+  const { get } = useDrivers();
   const rows = useTowerRows();
   const [picked, setPicked] = useState<string | null>(null);
   const [cleared, setCleared] = useState(false);
@@ -62,9 +67,10 @@ export function RaceCentre() {
   };
   const show = (t: MobileTab) => (mobile === t ? "" : "max-lg:hidden");
   const sideTabs = [
-    { value: "control" as const, label: `Control${messages.length ? ` ${messages.length}` : ""}` },
-    { value: "radio" as const, label: `Radio${radioCount ? ` ${radioCount}` : ""}` },
+    { value: "control" as const, label: `${t("Control")}${messages.length ? ` ${messages.length}` : ""}` },
+    { value: "radio" as const, label: `${t("Radio")}${radioCount ? ` ${radioCount}` : ""}` },
     { value: "chat" as const, label: "Chat" },
+    { value: "ask" as const, label: "Ask AI" },
     { value: "pits" as const, label: "Pits" },
     ...(race ? [{ value: "title" as const, label: "Title" }] : []),
   ];
@@ -72,8 +78,8 @@ export function RaceCentre() {
 
   const sidePanel = (
     <Card
-      title={{ control: "Race control", radio: "Team radio", chat: "Chat", pits: "Pit stops", title: "Live championship" }[sideTab]}
-      icon={{ control: <Flag size={15} />, radio: <Radio size={15} />, chat: <MessageCircle size={15} />, pits: <Timer size={15} />, title: <Trophy size={15} /> }[sideTab]}
+      title={{ control: "Race control", radio: "Team radio", chat: "Chat", ask: "Ask the analyst", pits: "Pit stops", title: "Live championship" }[sideTab]}
+      icon={{ control: <Flag size={15} />, radio: <Radio size={15} />, chat: <MessageCircle size={15} />, ask: <Sparkles size={15} />, pits: <Timer size={15} />, title: <Trophy size={15} /> }[sideTab]}
     >
       <div className="mb-3 max-lg:hidden [&>div]:flex [&>div]:w-full [&_button]:flex-1">
         <Segmented size="sm" value={sideTab} onChange={setSide} options={sideTabs} />
@@ -82,6 +88,7 @@ export function RaceCentre() {
         {sideTab === "control" && <RaceControlList focus={focus} />}
         {sideTab === "radio" && <RadioPlayer focus={focus} />}
         {sideTab === "chat" && <Chat />}
+        {sideTab === "ask" && <AskAnalyst focusName={focus ? get(focus).fullName : null} />}
         {sideTab === "pits" && <PitStops focus={focus} />}
         {sideTab === "title" && <LiveChampionship />}
       </div>
@@ -95,10 +102,10 @@ export function RaceCentre() {
           <div className="flex flex-wrap gap-2">
             <PopOutButton />
             <Link href="/live/tv" className="hidden items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-ink md:flex">
-              <Tv size={14} /> TV mode
+              <Tv size={14} /> {t("TV mode")}
             </Link>
             <Link href="/" className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-ink">
-              <ArrowLeft size={14} /> Overview
+              <ArrowLeft size={14} /> {t("Overview")}
             </Link>
           </div>
         }
@@ -109,7 +116,7 @@ export function RaceCentre() {
           value={mobile}
           onChange={(t) => {
             setMobile(t);
-            if (t === "control" || t === "radio" || t === "chat") setSide(t);
+            if (t === "control" || t === "radio" || t === "chat" || t === "ask") setSide(t);
           }}
           options={[
             { value: "track", label: "Track" },
@@ -119,6 +126,7 @@ export function RaceCentre() {
             { value: "control", label: "Control" },
             { value: "radio", label: "Radio" },
             { value: "chat", label: "Chat" },
+            { value: "ask", label: "Ask AI" },
           ]}
         />
       </div>
@@ -149,7 +157,7 @@ export function RaceCentre() {
             <Insights focus={focus} />
           </div>
           {/* The side panel is mounted once (chat and radio keep one connection/player). */}
-          {!wide && <div className={cn(mobile === "control" || mobile === "radio" || mobile === "chat" ? "" : "max-lg:hidden")}>{sidePanel}</div>}
+          {!wide && <div className={cn(mobile === "control" || mobile === "radio" || mobile === "chat" || mobile === "ask" ? "" : "max-lg:hidden")}>{sidePanel}</div>}
           <div className="grid gap-4 max-lg:hidden md:grid-cols-2">
             <BattlesPanel onSelect={select} />
             <WeatherPanel />
@@ -165,6 +173,7 @@ export function RaceCentre() {
 }
 
 function NotLive() {
+  const t = useT();
   const { data } = useApi<Weekend>("/api/weekend");
   const now = useNow(30_000);
   const race = data?.current;
@@ -176,7 +185,7 @@ function NotLive() {
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-2 text-accent">
             <Radio size={26} />
           </span>
-          <h1 className="font-display text-2xl font-bold">No session is live right now</h1>
+          <h1 className="font-display text-2xl font-bold">{t("No session is live right now")}</h1>
           <p className="max-w-md text-muted">
             The race centre fills with the live map, race control, team radio and timing as soon as a session starts. This page switches over by itself.
           </p>
@@ -193,10 +202,10 @@ function NotLive() {
           )}
           <div className="mt-2 flex flex-wrap justify-center gap-2">
             <Link href="/" className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-accent-ink">
-              <MapIcon size={15} /> This weekend
+              <MapIcon size={15} /> {t("This weekend")}
             </Link>
             <Link href="/replay" className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-2 text-sm font-semibold hover:bg-surface-2">
-              <History size={15} /> Watch a replay
+              <History size={15} /> {t("Watch a replay")}
             </Link>
           </div>
         </div>
