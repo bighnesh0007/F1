@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, createElement, useContext, useEffect, useState } from "react";
 
 // Tiny data hook for the server's JSON API (through the /api proxy). Responses are
 // cached per path for the page's lifetime, and refetched in the background.
@@ -21,12 +21,22 @@ async function load(path: string) {
   return promise;
 }
 
+// Data fetched on the server while rendering the page, so the first paint already
+// has it (no loading skeleton, no extra request).
+const SeedContext = createContext<Record<string, unknown>>({});
+
+export function ApiSeed({ data, children }: { data: Record<string, unknown>; children: React.ReactNode }) {
+  const parent = useContext(SeedContext);
+  return createElement(SeedContext.Provider, { value: { ...parent, ...data } }, children);
+}
+
 export function useApi<T>(path: string | null, { refreshMs }: { refreshMs?: number } = {}) {
-  const [state, setState] = useState<{ path: string | null; data: T | null; error: string | null }>(() => ({
-    path,
-    data: path ? ((cache.get(path)?.data as T) ?? null) : null,
-    error: null,
-  }));
+  const seed = useContext(SeedContext);
+  const seeded = path != null && seed[path] != null ? (seed[path] as T) : null;
+  const [state, setState] = useState<{ path: string | null; data: T | null; error: string | null }>(() => {
+    if (path && seeded != null && !cache.has(path)) cache.set(path, { at: Date.now(), data: seeded });
+    return { path, data: path ? ((cache.get(path)?.data as T) ?? seeded) : null, error: null };
+  });
 
   useEffect(() => {
     if (!path) return;

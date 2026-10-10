@@ -1,11 +1,13 @@
-"use client";
-
-import { useLive } from "@/lib/live-context";
-import { sessionIsActive } from "@/lib/live";
-import { LiveView } from "@/components/live/LiveView";
-import { WeekendView } from "@/components/live/WeekendView";
+import { Suspense } from "react";
+import { HomeView } from "@/components/live/HomeView";
+import { Seeded } from "@/components/Seeded";
 
 export default function LivePage() {
-  const { topics, connection } = useLive();
-  return sessionIsActive(topics, connection) ? <LiveView /> : <WeekendView />;
+  return (
+    <Suspense fallback={<HomeView />}>
+      <Seeded paths={["/api/weekend", "/api/standings"]}>
+        <HomeView />
+      </Seeded>
+    </Suspense>
+  );
 }

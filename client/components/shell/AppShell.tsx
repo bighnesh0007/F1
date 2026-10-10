@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useState } from "react";
-import { BarChart3, CalendarDays, History, Radio, Settings2, Trophy } from "lucide-react";
+import { BarChart3, CalendarDays, History, Radio, Settings2, Ticket, Trophy } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { Avatar, Coins } from "@/components/account/Avatar";
 import { useLive } from "@/lib/live-context";
 import { sessionIsActive } from "@/lib/live";
 import { cn } from "@/components/ui";
@@ -15,6 +17,7 @@ const NAV = [
   { href: "/", label: "Live", icon: Radio },
   { href: "/schedule", label: "Schedule", icon: CalendarDays },
   { href: "/standings", label: "Standings", icon: Trophy },
+  { href: "/play", label: "Play", icon: Ticket },
   { href: "/stats", label: "Stats", icon: BarChart3 },
   { href: "/replay", label: "Replay", icon: History },
 ];
@@ -23,6 +26,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { topics, connection } = useLive();
   const live = sessionIsActive(topics, connection);
+  const { user, loading } = useAuth();
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -45,6 +49,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <span className="live-dot h-1.5 w-1.5 rounded-full bg-accent-ink" /> LIVE
               </Link>
             )}
+            {!loading &&
+              (user ? (
+                <Link href="/profile" className="flex items-center gap-2 rounded-full border border-line bg-surface py-0.5 pr-3 pl-0.5 shadow-card hover:border-line-strong" title="Your profile">
+                  <Avatar name={user.displayName} src={user.avatarUrl} team={user.profile.team} size={28} />
+                  <Coins value={user.coins} className="text-sm" />
+                </Link>
+              ) : (
+                <Link href="/login" className="rounded-xl bg-accent px-3 py-1.5 text-sm font-semibold text-accent-ink">
+                  Sign in
+                </Link>
+              ))}
             <button
               onClick={() => setSettingsOpen(true)}
               aria-label="Settings"
@@ -59,7 +74,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 pt-4 pb-24 md:pb-10">{children}</main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           <Suspense fallback={<NavLinks live={live} variant="bottom" pathname={null} />}>
             <ActiveNavLinks live={live} variant="bottom" />
           </Suspense>

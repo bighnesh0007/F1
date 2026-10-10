@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarPlus, ChevronRight, Zap } from "lucide-react";
+import { ChevronRight, Zap } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { useYearParam, yearQuery } from "@/lib/useYear";
 import { useNow } from "@/lib/useNow";
 import { countryFlag, dateRange, localDay, localTime, timeZoneName } from "@/lib/format";
-import { downloadWeekendIcs } from "@/lib/ics";
+import { CalendarMenu } from "./CalendarMenu";
 import type { Race, SeasonRound } from "@/lib/types";
 import { Countdown, ErrorNote, Skeleton, Spoiler, cn } from "@/components/ui";
 import { YearPicker } from "./YearPicker";
@@ -49,7 +49,7 @@ export function ScheduleView() {
               <div
                 key={race.round}
                 className={cn(
-                  "group relative flex flex-col rounded-2xl border bg-surface p-4 shadow-card transition-all hover:-translate-y-0.5 hover:border-line-strong",
+                  "group relative flex flex-col rounded-2xl border bg-surface p-4 shadow-card transition-all hover:-translate-y-0.5 hover:border-line-strong has-[[aria-expanded=true]]:z-20",
                   next ? "border-accent ring-1 ring-accent/40 sm:col-span-2 xl:col-span-1" : "border-line",
                 )}
               >
@@ -95,13 +95,9 @@ export function ScheduleView() {
                 </div>
                 <ChevronRight size={16} className="pointer-events-none absolute right-3 bottom-4 text-faint transition-transform group-hover:translate-x-0.5" />
                 {!done && now != null && (
-                  <button
-                    onClick={() => downloadWeekendIcs(race)}
-                    title="Add to calendar"
-                    className="absolute right-9 bottom-3 z-10 rounded-lg p-1 text-faint hover:bg-surface-2 hover:text-ink"
-                  >
-                    <CalendarPlus size={15} />
-                  </button>
+                  <div className="absolute right-8 bottom-3 z-10">
+                    <CalendarMenu race={race} variant="icon" />
+                  </div>
                 )}
               </div>
             );

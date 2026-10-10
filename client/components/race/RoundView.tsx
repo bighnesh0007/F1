@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ArrowLeft, CalendarPlus, ChevronDown, ChevronUp, Flag, Gauge, Sparkles, Timer, TrendingUp, Wrench, Zap } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Flag, Gauge, Sparkles, Timer, TrendingUp, Wrench, Zap } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { useYearParam, yearQuery } from "@/lib/useYear";
 import { useNow } from "@/lib/useNow";
 import { useDrivers, useTeamColour } from "@/lib/drivers";
 import { useSettings } from "@/lib/settings";
 import { countryFlag, dateRange } from "@/lib/format";
-import { downloadWeekendIcs } from "@/lib/ics";
+import { CalendarMenu } from "./CalendarMenu";
 import type { Race, RaceDetail, Result } from "@/lib/types";
 import { Card, Countdown, ErrorNote, Skeleton, Spoiler, TeamBar, cn } from "@/components/ui";
 import { CircuitGuide } from "./CircuitGuide";
@@ -64,12 +64,13 @@ export function RoundView() {
       {done && <RaceSummary season={race.season} round={race.round} />}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
-        <Card title="Sessions" right={!done ? (
-          <button onClick={() => downloadWeekendIcs(race)} className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-ink">
-            <CalendarPlus size={14} /> Add to calendar
-          </button>
-        ) : null}>
+        <Card title="Sessions">
           <SessionList sessions={race.sessions} />
+          {!done && (
+            <div className="mt-3">
+              <CalendarMenu race={race} />
+            </div>
+          )}
         </Card>
         <CircuitGuide circuit={race.circuit} />
       </div>

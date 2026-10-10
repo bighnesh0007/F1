@@ -101,6 +101,26 @@ export class LiveState {
   snapshot() {
     return { topics: this.topics, updatedAt: this.updatedAt };
   }
+
+  // Derived data that can't be rebuilt from the feed's snapshot (it only has the
+  // current state), saved so a server restart mid-session keeps the history.
+  persisted() {
+    return {
+      path: this.topics.SessionInfo?.Path ?? null,
+      LapHistory: this.topics.LapHistory ?? {},
+      Events: this.topics.Events ?? {},
+      eventCount: this.analysis.eventCount,
+    };
+  }
+
+  restore(saved) {
+    if (!saved?.path || saved.path !== this.topics.SessionInfo?.Path) return false;
+    this.topics.LapHistory = deepMerge(saved.LapHistory, this.topics.LapHistory ?? {});
+    // Saved events already include the snapshot's race control and radio messages.
+    this.topics.Events = saved.Events;
+    this.analysis.eventCount = Math.max(this.analysis.eventCount, saved.eventCount ?? 0);
+    return true;
+  }
 }
 
 function latestSample(topic, patch) {

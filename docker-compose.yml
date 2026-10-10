@@ -4,10 +4,24 @@ services:
     container_name: f1-server
     environment:
       PORT: 4000
-      # Optional F1 TV token (put it in a .env file next to this one).
+      REDIS_URL: redis://redis:6379
+      # Local MongoDB by default. For MongoDB Atlas, set MONGODB_URI in .env.
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017}
+      MONGODB_DB: ${MONGODB_DB:-f1live}
+      # The address people open in their browser (used for Google sign-in and calendar links).
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # Optional F1 TV token for live car positions.
       F1_AUTH_TOKEN: ${F1_AUTH_TOKEN:-}
     ports:
       - "4000:4000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:4000/api/health"]
       interval: 10s
@@ -27,3 +41,34 @@ services:
       server:
         condition: service_healthy
     restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: f1-redis
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # Local database for accounts and predictions. Not needed if MONGODB_URI points to
+  # MongoDB Atlas (it then just sits idle).
+  mongo:
+    image: mongo:7
+    container_name: f1-mongo
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  mongo-data:

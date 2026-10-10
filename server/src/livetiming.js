@@ -7,9 +7,12 @@
 import { EventEmitter } from 'node:events';
 import * as signalR from '@microsoft/signalr';
 import { LiveState } from './state.js';
+import { kv } from './db/redis.js';
 
 const BASE_URL = process.env.F1_LIVETIMING_URL || 'https://livetiming.formula1.com';
 const RECONNECT_DELAY_MS = 30_000;
+const PERSIST_INTERVAL_MS = 15_000;
+const PERSIST_KEY = 'live:derived';
 
 export const TOPICS = [
   'Heartbeat',
@@ -120,6 +123,13 @@ export class LiveTimingClient extends EventEmitter {
   async subscribe() {
     const snapshot = await this.connection.invoke('Subscribe', TOPICS);
     this.state.load(snapshot);
+    try {
+      const saved = JSON.parse((await kv.get(PERSIST_KEY)) ?? 'null');
+      if (this.state.restore(saved)) console.log('Live timing: restored lap history and race feed for this session');
+    } catch (err) {
+      console.error('Live timing: could not restore saved session data:', err.message);
+    }
+    this.startPersisting();
     this.lastMessageAt = new Date().toISOString();
     this.setStatus('connected');
     this.lastError = null;
@@ -133,6 +143,15 @@ export class LiveTimingClient extends EventEmitter {
     } catch (err) {
       console.error(`Failed to process ${topic}:`, err.message);
     }
+  }
+
+  startPersisting() {
+    if (this.persistTimer) return;
+    this.persistTimer = setInterval(() => {
+      if (!this.state.topics.SessionInfo?.Path) return;
+      kv.set(PERSIST_KEY, JSON.stringify(this.state.persisted()), 6 * 3600).catch(() => {});
+    }, PERSIST_INTERVAL_MS);
+    this.persistTimer.unref();
   }
 
   setStatus(status) {
@@ -159,6 +178,8 @@ export class LiveTimingClient extends EventEmitter {
   async stop() {
     this.stopped = true;
     clearTimeout(this.reconnectTimer);
+    clearInterval(this.persistTimer);
+    if (this.state.topics.SessionInfo?.Path) await kv.set(PERSIST_KEY, JSON.stringify(this.state.persisted()), 6 * 3600).catch(() => {});
     const connection = this.connection;
     this.connection = null;
     await connection?.stop();

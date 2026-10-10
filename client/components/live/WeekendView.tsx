@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight, Bell, BellRing, CalendarPlus, CalendarDays, CloudSun, Flag, Trophy } from "lucide-react";
+import { ArrowRight, Bell, BellRing, CalendarDays, CloudSun, Flag, Trophy } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { useSettings } from "@/lib/settings";
 import { useDrivers, useTeamColour } from "@/lib/drivers";
-import { downloadWeekendIcs } from "@/lib/ics";
 import { countryFlag, dateRange, localDay, localTime } from "@/lib/format";
 import { useNow } from "@/lib/useNow";
 import type { RaceDetail, Standings, Weekend } from "@/lib/types";
@@ -15,6 +14,7 @@ import { CircuitMapView } from "@/components/track/CircuitMapView";
 import { CircuitGuide, useCircuitMap } from "@/components/race/CircuitGuide";
 import { SessionList } from "@/components/race/SessionList";
 import { Podium } from "@/components/race/Podium";
+import { CalendarMenu } from "@/components/race/CalendarMenu";
 
 export function WeekendView() {
   const { data, error } = useApi<Weekend>("/api/weekend", { refreshMs: 10 * 60_000 });
@@ -42,12 +42,9 @@ export function WeekendView() {
         <div className="space-y-4">
           <Card title="Weekend schedule" icon={<CalendarDays size={15} />} right={<ReminderButton />}>
             <SessionList sessions={race.sessions} />
-            <button
-              onClick={() => downloadWeekendIcs(race)}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-line py-2 text-sm font-medium text-muted hover:bg-surface-2 hover:text-ink"
-            >
-              <CalendarPlus size={15} /> Add weekend to calendar
-            </button>
+            <div className="mt-3">
+              <CalendarMenu race={race} />
+            </div>
           </Card>
           <RadarCard lat={race.circuit.lat} lon={race.circuit.lon} />
         </div>

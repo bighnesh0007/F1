@@ -5,20 +5,31 @@ import * as jolpica from './jolpica.js';
 import * as f1static from './f1static.js';
 import { getCircuitMap } from './maps.js';
 import { LiveTimingClient } from './livetiming.js';
+import { connectRedis } from './db/redis.js';
+import { connectMongo, mongoReady } from './db/mongo.js';
+import { authRouter, loadUser, requireJson, requireUser, googleConfigured } from './auth.js';
+import { profileRouter } from './profile.js';
+import { gameRouter, startSettlementJob } from './game.js';
+import { calendarRouter } from './calendar.js';
 
 const PORT = Number(process.env.PORT) || 4000;
 const app = express();
 const live = new LiveTimingClient();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
+app.set('trust proxy', true);
+app.use(cors({ origin: process.env.CORS_ORIGIN || false }));
+app.use(express.json({ limit: '100kb' }));
+app.use(requireJson);
 // Compress JSON, but never the live event stream (it must flush immediately).
 app.use(compression({ filter: (req, res) => !req.path.startsWith('/api/live/stream') && compression.filter(req, res) }));
 
-// Wraps an async handler: JSON response, or a 502 with the upstream error.
+// Wraps an async handler for public data: JSON response with a short browser cache,
+// or a 502 with the upstream error.
 const route = (handler) => async (req, res) => {
   try {
     const data = await handler(req);
     if (data == null) return res.status(404).json({ error: 'Not found' });
+    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=300');
     res.json(data);
   } catch (err) {
     console.error(`${req.path}:`, err.message);
@@ -29,8 +40,22 @@ const route = (handler) => async (req, res) => {
 const year = (req) => (/^\d{4}$/.test(req.query.year ?? '') ? Number(req.query.year) : 'current');
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString(), live: live.info() });
+  res.json({
+    status: 'ok',
+    time: new Date().toISOString(),
+    live: live.info(),
+    accounts: mongoReady(),
+    google: googleConfigured(),
+  });
 });
+
+// --- Accounts, profiles, game, calendar ------------------------------------------------
+
+app.use('/api', loadUser);
+app.use('/api/auth', authRouter());
+app.use('/api', profileRouter(requireUser));
+app.use('/api/game', gameRouter(requireUser));
+app.use('/api/calendar', calendarRouter(requireUser));
 
 // --- Live -----------------------------------------------------------------------
 
@@ -115,6 +140,22 @@ app.get(
     return getCircuitMap({ key, location: req.query.locality ?? req.query.location, circuitId: req.query.circuitId });
   }),
 );
+
+// Errors from the account routes: JSON with the right status. Google sign-in errors
+// redirect back to the login page instead.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, _next) => {
+  const upstream = err.message === 'fetch failed' || /^\d{3} from /.test(err.message);
+  const status = err.status && !upstream ? err.status : upstream ? 502 : err.type === 'entity.parse.failed' ? 400 : 500;
+  if (status >= 500) console.error(`${req.method} ${req.path}:`, err);
+  if (req.path.startsWith('/api/auth/google')) return res.redirect(`/login?error=${encodeURIComponent(err.message)}`);
+  const message = upstream ? 'F1 data is temporarily unavailable' : status >= 500 && !err.status ? 'Something went wrong' : err.message;
+  res.status(status).json({ error: message });
+});
+
+await connectRedis();
+await connectMongo();
+if (mongoReady()) startSettlementJob();
 
 const server = app.listen(PORT, () => {
   console.log(`F1 server listening on http://localhost:${PORT}`);

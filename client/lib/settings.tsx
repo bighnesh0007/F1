@@ -112,7 +112,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
 export const useSettings = () => useContext(SettingsContext);
 
-function readableInk(hex: string) {
+// Black or white, whichever reads better on the given colour.
+export function readableInk(hex: string) {
   const n = parseInt(hex.slice(1), 16);
   const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   return 0.299 * r + 0.587 * g + 0.114 * b > 160 ? "#111111" : "#ffffff";
