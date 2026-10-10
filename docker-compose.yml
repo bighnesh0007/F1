@@ -4,6 +4,8 @@ services:
     container_name: f1-server
     environment:
       PORT: 4000
+      # Optional F1 TV token (put it in a .env file next to this one).
+      F1_AUTH_TOKEN: ${F1_AUTH_TOKEN:-}
     ports:
       - "4000:4000"
     healthcheck:

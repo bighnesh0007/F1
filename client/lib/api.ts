@@ -31,3 +31,19 @@ export async function getWeekend(): Promise<Weekend> {
   }
   return res.json();
 }
+
+export type Standings = {
+  season: string | null;
+  round: string | null;
+  drivers: { position: number; points: number; wins: number; code: string; name: string; team: string }[];
+  constructors: { position: number; points: number; wins: number; name: string }[];
+};
+
+export async function getStandings(): Promise<Standings> {
+  const res = await fetch(`${serverUrl()}/api/standings`, { cache: "no-store" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Server responded ${res.status}`);
+  }
+  return res.json();
+}
