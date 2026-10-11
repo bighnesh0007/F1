@@ -186,7 +186,13 @@ app.use((err, req, res, _next) => {
   res.status(status).json({ error: message });
 });
 
+// Start answering right away (public F1 data and the health check don't need the
+// databases), then connect Redis and MongoDB. A slow or unreachable database (e.g. an
+// Atlas IP allow-list) only switches accounts off; it never stops the server starting.
+const server = app.listen(PORT, () => console.log(`F1 server listening on http://localhost:${PORT}`));
+
 await connectRedis();
+live.start();
 await connectMongo();
 if (mongoReady()) startScoringJob();
 startPushNotifications(live);
@@ -196,11 +202,6 @@ await startChat();
 setTimeout(() => jolpica.warmChampions(), 5000).unref();
 // Prepare this week's quiz in the background (it reads several seasons of results).
 setTimeout(() => getQuiz().catch(() => {}), 15_000).unref();
-
-const server = app.listen(PORT, () => {
-  console.log(`F1 server listening on http://localhost:${PORT}`);
-  live.start();
-});
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {

@@ -36,8 +36,9 @@ services:
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:4000/api/health"]
       interval: 10s
-      timeout: 3s
-      retries: 5
+      timeout: 5s
+      start_period: 30s
+      retries: 10
     restart: unless-stopped
 
   client:
@@ -63,6 +64,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: f1-redis
+    # Keep database logs out of `docker compose up` (see them with `docker compose logs redis`).
+    attach: false
     command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
       - redis-data:/data
@@ -78,10 +81,14 @@ services:
   mongo:
     image: mongo:7
     container_name: f1-mongo
+    # --quiet stops a log line for every connection (the health check connects every 10s).
+    command: ["--quiet"]
+    attach: false
     volumes:
       - mongo-data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      start_period: 20s
       interval: 10s
       timeout: 5s
       retries: 10

@@ -77,6 +77,16 @@ All configuration lives in one file: copy `.env.example` to `.env` in the projec
 
 **Accessibility**: keyboard navigation everywhere (skip link, visible focus, cars on the map can be selected with Tab and Enter, dialogs keep focus inside), screen-reader labels and live announcements for race control, a colour-blind friendly palette (blue/orange instead of green/red), and a reduce-motion switch that also follows the device setting.
 
+### If the server shows as unhealthy
+
+See its own log (database logs are kept out of `docker compose up`):
+
+```bash
+docker compose logs server
+```
+
+The server starts answering straight away and connects to the databases in the background, so a database problem shows up in that log (e.g. `MongoDB: can't connect yet ...`) instead of blocking start-up. With MongoDB Atlas, the usual cause is the IP access list: allow your machine's IP (or `0.0.0.0/0` while testing) under Atlas → Network Access, and check the user name and password in `MONGODB_URI`.
+
 ## Data sources
 
 | Source | Used for | Cost |

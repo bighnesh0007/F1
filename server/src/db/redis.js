@@ -20,11 +20,12 @@ export async function connectRedis() {
     ready = true;
     console.log('Redis: connected');
   });
-  try {
-    await client.connect();
-  } catch (err) {
+  // connect() keeps retrying while Redis is down, so don't wait for it forever.
+  const connecting = client.connect().catch((err) => {
     console.error('Redis: could not connect, using in-memory storage until it is reachable:', err.message);
-  }
+  });
+  const timedOut = await Promise.race([connecting.then(() => false), new Promise((r) => setTimeout(() => r(true), 10_000).unref())]);
+  if (timedOut) console.error(`Redis: ${url.replace(/\/\/[^@]*@/, '//***@')} isn't reachable yet; using in-memory storage and retrying in the background`);
   return client;
 }
 

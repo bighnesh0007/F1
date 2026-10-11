@@ -16,6 +16,7 @@ export async function connectMongo() {
       await client.connect();
       break;
     } catch (err) {
+      console.error(`MongoDB: can't connect yet (attempt ${attempt}/10): ${err.message}`);
       if (attempt >= 10) {
         console.error('MongoDB: could not connect, profiles and predictions are disabled:', err.message);
         return null;
