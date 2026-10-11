@@ -10,8 +10,23 @@ const MAX_MEMORY_ENTRIES = 300;
 const STALE_KEEP_SECONDS = 14 * 24 * 3600;
 const inflight = new Map();
 
+// "fetch failed" on its own says nothing; add the host and the network reason
+// (e.g. ENETUNREACH, ECONNREFUSED, a timeout) so problems can be diagnosed from logs.
+export function describeFetchError(err, url) {
+  const cause = err?.cause;
+  const reason = cause?.code ?? cause?.errors?.map((e) => e.code).filter(Boolean).join('/') ?? (err?.name === 'TimeoutError' ? 'timed out' : null);
+  if (err?.message === 'fetch failed' || err?.name === 'TimeoutError') {
+    const e = new Error(`fetch failed: ${new URL(url).host}${reason ? ` (${reason})` : ''}`);
+    e.cause = cause;
+    return e;
+  }
+  return err;
+}
+
 export async function fetchText(url, { headers = {}, timeoutMs = 20_000 } = {}) {
-  const res = await fetch(url, { headers: { 'User-Agent': 'f1-live/1.0', ...headers }, signal: AbortSignal.timeout(timeoutMs) });
+  const res = await fetch(url, { headers: { 'User-Agent': 'f1-live/1.0', ...headers }, signal: AbortSignal.timeout(timeoutMs) }).catch((err) => {
+    throw describeFetchError(err, url);
+  });
   if (!res.ok) {
     const err = new Error(`${res.status} from ${new URL(url).host}${new URL(url).pathname}`);
     err.status = res.status;

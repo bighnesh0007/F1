@@ -160,7 +160,8 @@ export class LiveTimingClient extends EventEmitter {
   }
 
   fail(err) {
-    this.lastError = err?.message || String(err);
+    const cause = err?.cause?.code ?? err?.cause?.errors?.map((e) => e.code).filter(Boolean).join('/');
+    this.lastError = `${err?.message || String(err)}${cause ? ` (${cause})` : ''}`;
     console.error('Live timing error:', this.lastError);
     this.setStatus('disconnected');
     this.scheduleReconnect();

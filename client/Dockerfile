@@ -15,7 +15,9 @@ RUN npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
+# Prefer IPv4 for outgoing requests (Docker often has no IPv6 route).
 ENV NODE_ENV=production \
+    NODE_OPTIONS=--dns-result-order=ipv4first \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0

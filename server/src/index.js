@@ -1,3 +1,4 @@
+import dns from 'node:dns';
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
@@ -22,6 +23,10 @@ import { searchNews } from './news.js';
 import { getTrip } from './trip.js';
 import { aiRouter } from './ai.js';
 import { socialRouter } from './social.js';
+
+// Try IPv4 addresses first: inside Docker there is often no IPv6 route, and on networks
+// with DNS64 every host also gets an IPv6 address that can't be reached from there.
+dns.setDefaultResultOrder('ipv4first');
 
 const PORT = Number(process.env.PORT) || 4000;
 const app = express();
@@ -179,7 +184,7 @@ app.get(
 // Errors from the account routes: JSON with the right status.
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, _next) => {
-  const upstream = err.message === 'fetch failed' || /^\d{3} from /.test(err.message);
+  const upstream = /^fetch failed/.test(err.message) || /^\d{3} from /.test(err.message);
   const status = err.status && !upstream ? err.status : upstream ? 502 : err.type === 'entity.parse.failed' ? 400 : 500;
   if (status >= 500) console.error(`${req.method} ${req.path}:`, err);
   const message = upstream ? 'F1 data is temporarily unavailable' : status >= 500 && !err.status ? 'Something went wrong' : err.message;
