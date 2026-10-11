@@ -69,7 +69,7 @@ export function PitLane({ onSelect, focus }: { onSelect: (n: string) => void; fo
                 <span className={cn("rounded-md px-1.5 py-0.5 font-display text-xs font-bold text-white shadow-card", focus === row.number && "ring-2 ring-accent")} style={{ background: `#${d.colour}` }}>
                   {d.tla}
                 </span>
-                {elapsed != null && <span className="tnum mt-0.5 text-[10px] font-semibold text-ink">{elapsed.toFixed(1)}s</span>}
+                {elapsed != null && <span className="tnum mt-0.5 text-[10px] font-semibold text-ink">{elapsed > 90 ? "Garage" : `${elapsed.toFixed(1)}s`}</span>}
               </motion.button>
             );
           })}

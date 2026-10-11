@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { buildTrack, type Track } from "@/lib/track";
+import { buildTrack, pathBetween, type Track } from "@/lib/track";
 import type { CircuitMap } from "@/lib/types";
 
 export type MapCar = {
@@ -25,6 +25,10 @@ export function CircuitMapView({
   children,
   extraPadding = 0,
   trackScale = 1,
+  sectors = null,
+  straights = null,
+  cornerBadges = false,
+  under,
 }: {
   map: CircuitMap;
   className?: string;
@@ -32,6 +36,14 @@ export function CircuitMapView({
   children?: (track: Track) => React.ReactNode;
   extraPadding?: number;
   trackScale?: number; // wider tarmac, with edges and a centre line, when > 1
+  /** Lap fractions where sectors 2 and 3 start: the track is coloured by sector. */
+  sectors?: [number, number] | null;
+  /** Long straights to mark with a dashed green line, as [start, end] lap fractions. */
+  straights?: [number, number][] | null;
+  /** Corner numbers in round badges instead of plain text. */
+  cornerBadges?: boolean;
+  /** Drawn on the track but below the corner numbers and cars (e.g. a pit lane). */
+  under?: (track: Track) => React.ReactNode;
 }) {
   const track = useMemo(() => buildTrack(map), [map]);
   const { bounds, size, points } = track;
@@ -50,11 +62,31 @@ export function CircuitMapView({
       ) : (
         <path d={path} fill="none" stroke="var(--border-strong)" strokeWidth={size / 110} strokeLinejoin="round" strokeLinecap="round" />
       )}
+      {sectors &&
+        SECTOR_COLOURS.map((colour, i) => {
+          const from = i === 0 ? 0 : sectors[i - 1];
+          const to = i === 2 ? 1 : sectors[i];
+          return <path key={i} d={pathBetween(track, from, to)} fill="none" stroke={colour} strokeWidth={size / 150} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />;
+        })}
+      {straights?.map(([a, b], i) => (
+        <path key={i} d={pathBetween(track, a, b, (size / 34) * trackScale * 0.32)} fill="none" stroke="#22c55e" strokeWidth={size / 170} strokeDasharray={`${size / 120} ${size / 160}`} strokeLinecap="round" opacity={0.95} />
+      ))}
+      {under?.(track)}
       {finish && <line {...finish} stroke="var(--text)" strokeWidth={size / 160} strokeLinecap="round" />}
       {showCorners &&
         map.corners.map((c) => {
           const r = (c.angle * Math.PI) / 180;
-          const off = track.toScreen(c.x + Math.cos(r) * 650, c.y + Math.sin(r) * 650);
+          const off = track.toScreen(c.x + Math.cos(r) * (cornerBadges ? 900 : 650), c.y + Math.sin(r) * (cornerBadges ? 900 : 650));
+          if (cornerBadges) {
+            return (
+              <g key={`${c.number}${c.letter}`} transform={`translate(${off.x} ${off.y})`} className="select-none">
+                <circle r={size / 58} fill="var(--surface-2)" stroke="var(--border-strong)" strokeWidth={size / 600} />
+                <text fontSize={size / 66} textAnchor="middle" dominantBaseline="central" fill="var(--muted)" className="font-display font-bold">
+                  {`${c.number}${c.letter ?? ""}`}
+                </text>
+              </g>
+            );
+          }
           return (
             <text
               key={`${c.number}${c.letter}`}
@@ -74,6 +106,9 @@ export function CircuitMapView({
     </svg>
   );
 }
+
+// Sector 1, 2 and 3, as on F1's own graphics.
+export const SECTOR_COLOURS = ["#ef4444", "#3b82f6", "#eab308"];
 
 function finishLine(points: { x: number; y: number }[], size: number) {
   const a = points[0];

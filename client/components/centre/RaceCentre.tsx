@@ -30,6 +30,7 @@ import { DriverFocus } from "./DriverFocus";
 import { LiveChampionship, PitStops } from "./PitsAndTitle";
 import { LiveTicker } from "./LiveTicker";
 import { PitLane } from "./PitLane";
+import { ComparePanel } from "./ComparePanel";
 
 // Charts in the driver sheet load when it is first opened.
 const Insights = dynamic(() => import("@/components/live/Insights").then((m) => m.Insights));
@@ -51,6 +52,8 @@ export function RaceCentre() {
   const [profile, setProfile] = useState<string | null>(null);
   const [side, setSide] = useState<SideTab>("control");
   const [mobile, setMobile] = useState<MobileTab>("track");
+  const [compareMode, setCompareMode] = useState(false);
+  const [compare, setCompare] = useState<string[]>([]);
   const messages = useRaceControl();
   const radioCount = list(topics.TeamRadio?.Captures).length;
   const wide = useMedia("(min-width: 1280px)");
@@ -63,6 +66,11 @@ export function RaceCentre() {
   // Follow the driver you picked, else your favourite, else the leader.
   const focus = picked ?? (cleared ? null : (settings.favouriteDriver ?? rows[0]?.number ?? null));
   const select = (n: string) => {
+    // In compare mode, taps pick the two cars to compare (the oldest pick drops off).
+    if (compareMode) {
+      setCompare((prev) => (prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].slice(-2)));
+      return;
+    }
     setPicked(n);
     setCleared(false);
     if (mobile === "track" || mobile === "timing") setMobile("driver");
@@ -142,8 +150,31 @@ export function RaceCentre() {
 
         <div className="min-w-0 space-y-4">
           <div className={show("track")}>
-            <LiveTrackMap onSelect={select} focus={focus} mapClassName="aspect-[4/3] lg:aspect-[16/10]" overlay={<LatestMessageBanner />} />
+            <LiveTrackMap
+              onSelect={select}
+              focus={focus}
+              mapClassName="aspect-[4/3] lg:aspect-[16/10]"
+              overlay={<LatestMessageBanner />}
+              compare={compareMode ? compare : []}
+              compareMode={compareMode}
+              onCompareMode={(on) => {
+                setCompareMode(on);
+                if (on && compare.length === 0 && focus) setCompare([focus]);
+              }}
+            />
           </div>
+          {compareMode && (
+            <div className={show("track")}>
+              <ComparePanel
+                numbers={compare}
+                onRemove={(n) => setCompare((prev) => prev.filter((x) => x !== n))}
+                onClose={() => {
+                  setCompareMode(false);
+                  setCompare([]);
+                }}
+              />
+            </div>
+          )}
           {race && (
             <div className={show("track")}>
               <PitLane onSelect={select} focus={focus} />
