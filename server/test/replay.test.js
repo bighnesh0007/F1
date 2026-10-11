@@ -19,3 +19,8 @@ test('replay timeline keeps only changed board fields and qualifying parts', () 
   assert.equal(rows.some((r) => r[0] === 6000), false); // nothing changed
   assert.deepEqual(rows.find((r) => r[1] === '44')[2].ko, true);
 });
+
+test('replay timeline finds the typical sector times', () => {
+  const timing = [1, 2, 3].map((k) => [k * 1000, { Lines: { 1: { Sectors: { 0: { Value: `${30 + k}.0` }, 1: { Value: '40.5' }, 2: { Value: '' } } }, 4: { Sectors: [{ Value: '31.0' }, { Value: '41.0' }, { Value: '25.5' }] } } }]);
+  assert.deepEqual(buildTimeline(timing, [], 0).sectorTimes, [31, 41, 25.5]);
+});

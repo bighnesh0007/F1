@@ -8,7 +8,8 @@ import { useSettings } from "@/lib/settings";
 import { countryFlag, localDay } from "@/lib/format";
 import { TRACK_STATUS } from "@/lib/live";
 import type { ArchivedSession, CircuitMap, Replay } from "@/lib/types";
-import { CarDot, CircuitMapView } from "@/components/track/CircuitMapView";
+import { CarDot, CircuitMapView, LayerChip, SECTOR_COLOURS } from "@/components/track/CircuitMapView";
+import { buildTrack, findStraights } from "@/lib/track";
 import { Card, Empty, ErrorNote, Segmented, Skeleton, cn } from "@/components/ui";
 import { flagSwatch } from "@/components/centre/RaceControl";
 import { boardAt, buildCheckpoints, kindOf, lastBefore, remainingAt, retirements } from "./board";
@@ -123,6 +124,16 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
     if (map?.source === "multiviewer") return map;
     return traceFromFrames(replay);
   }, [map, replay]);
+  const [layers, setLayers] = useState({ sectors: true, straights: true });
+  const exact = displayMap?.source === "multiviewer";
+  // Sector boundaries need a map that starts at the finish line (MultiViewer's).
+  const sectorSplits = useMemo<[number, number] | null>(() => {
+    const st = replay?.sectorTimes;
+    if (!exact || !st) return null;
+    const total = st[0] + st[1] + st[2];
+    return [st[0] / total, (st[0] + st[1]) / total];
+  }, [replay, exact]);
+  const straights = useMemo(() => (displayMap ? findStraights(buildTrack(displayMap)) : []), [displayMap]);
   const checkpoints = useMemo(() => (replay?.timing ? buildCheckpoints(replay) : null), [replay]);
   const outAt = useMemo(() => (replay?.timing ? retirements(replay) : new Map<string, number>()), [replay]);
 
@@ -181,7 +192,15 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
             </div>
           ) : null}
           {displayMap ? (
-            <CircuitMapView map={displayMap} className="aspect-[4/3] w-full" showCorners={displayMap.source === "multiviewer"} trackScale={1.7}>
+            <CircuitMapView
+              map={displayMap}
+              className="aspect-[4/3] w-full"
+              showCorners={exact}
+              cornerBadges={exact}
+              trackScale={1.7}
+              sectors={layers.sectors ? sectorSplits : null}
+              straights={layers.straights ? straights : null}
+            >
               {(trk) => (
                 <>
                   {incidents.map((m) => {
@@ -219,6 +238,16 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
             </CircuitMapView>
           ) : (
             <Skeleton className="aspect-[4/3]" />
+          )}
+          {displayMap && (sectorSplits || straights.length > 0) && (
+            <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1 text-[11px]">
+              <LayerChip on={layers.sectors} onClick={() => setLayers((l) => ({ ...l, sectors: !l.sectors }))} disabled={!sectorSplits} title="Track coloured by timing sector (boundaries estimated from the session's sector times)">
+                {SECTOR_COLOURS.map((c, i) => <span key={i} className="h-1.5 w-3 rounded-full" style={{ background: c }} />)} Sectors
+              </LayerChip>
+              <LayerChip on={layers.straights} onClick={() => setLayers((l) => ({ ...l, straights: !l.straights }))} disabled={straights.length === 0} title="Long straights where cars run at full power (worked out from the track shape)">
+                <span className="h-0 w-4 border-t-2 border-dashed border-green-500" /> Full-power straights
+              </LayerChip>
+            </div>
           )}
 
           <div className="mt-2 space-y-3 px-2">

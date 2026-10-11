@@ -229,7 +229,25 @@ export function buildTimeline(timingStream, appStream, offsetMs = 0) {
     if (data.NoEntries) cutoffs = Object.values(data.NoEntries).map(Number);
   }
   const timing = [...diffStream(timingStream, timingSummary, offsetMs), ...diffStream(appStream, appSummary, offsetMs)].sort((a, b) => a[0] - b[0]);
-  return { timing, parts, cutoffs };
+  return { timing, parts, cutoffs, sectorTimes: medianSectors(timingStream) };
+}
+
+// Typical time for each of the three sectors (median of every sector time set in
+// the session), used to colour the map by sector.
+function medianSectors(timingStream) {
+  const times = [[], [], []];
+  for (const [, data] of timingStream) {
+    for (const line of Object.values(data.Lines ?? {})) {
+      const sectors = line?.Sectors;
+      if (!sectors || typeof sectors !== 'object') continue;
+      for (const [i, sector] of Object.entries(sectors)) {
+        const v = Number(sector?.Value);
+        if (times[i] && v > 5 && v < 200) times[i].push(v);
+      }
+    }
+  }
+  if (times.some((t) => t.length === 0)) return null;
+  return times.map((t) => t.sort((a, b) => a - b)[Math.floor(t.length / 2)]);
 }
 
 // [t, current lap, total laps]; the total is only sent now and then, so carry it forward.
@@ -258,7 +276,7 @@ function parseClock(stream, offsetMs) {
 // race control messages.
 export function getReplay(path) {
   if (!/^\d{4}\/[\w\-.]+\/[\w\-.]+\/$/.test(path)) throw Object.assign(new Error('Invalid session path'), { status: 400 });
-  return cached(`replay:v2:${path}`, DAY, async () => {
+  return cached(`replay:v3:${path}`, DAY, async () => {
     const [info, drivers, position, timing, timingApp, lapCount, clock, trackStatus, rc] = await Promise.all([
       fetchStaticJson(`${path}SessionInfo.json`),
       fetchStaticJson(`${path}DriverList.json`),
@@ -317,6 +335,7 @@ export function getReplay(path) {
       timing: board.timing,
       parts: board.parts,
       cutoffs: board.cutoffs,
+      sectorTimes: board.sectorTimes,
       clock: parseClock(parseStream(clock, false), offsetMs),
       laps: lapRows(parseStream(lapCount, false), offsetMs),
       trackStatus: parseStream(trackStatus, false).map(([t, d]) => [Math.max(0, t - offsetMs), d.Status, d.Message]),

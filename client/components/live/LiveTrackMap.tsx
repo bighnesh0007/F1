@@ -9,7 +9,7 @@ import { useApi } from "@/lib/useApi";
 import { buildTrack, estimateFraction, findStraights, offsetAt, pathBetween, type Track } from "@/lib/track";
 import { list, type CarProgress, type LiveEvent } from "@/lib/live";
 import type { CircuitMap } from "@/lib/types";
-import { CarDot, CircuitMapView, SECTOR_COLOURS } from "@/components/track/CircuitMapView";
+import { CarDot, CircuitMapView, LayerChip, SECTOR_COLOURS } from "@/components/track/CircuitMapView";
 import { Card, Empty, Skeleton, cn } from "@/components/ui";
 
 const SLOW_TRACK_STATUSES = new Set(["4", "6", "7"]);
@@ -314,20 +314,6 @@ function PitLaneShape({ track }: { track: Track }) {
         PIT
       </text>
     </g>
-  );
-}
-
-function LayerChip({ on, onClick, disabled, title, children }: { on: boolean; onClick: () => void; disabled?: boolean; title: string; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={on}
-      title={title}
-      className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-semibold transition-opacity disabled:hidden", on ? "border-line bg-surface-2 text-ink" : "border-line text-faint opacity-60")}
-    >
-      {children}
-    </button>
   );
 }
 

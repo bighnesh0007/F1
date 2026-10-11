@@ -148,6 +148,7 @@ export type Replay = {
   timing: [number, string, Partial<ReplayBoardRow>][];
   parts: [number, number][]; // qualifying part (1–3) from time t
   cutoffs: number[] | null; // cars in each qualifying part
+  sectorTimes?: [number, number, number] | null; // typical sector times (s), for colouring the map
   clock: [number, number, boolean][]; // [t, remaining ms, counting down]
   laps: [number, number, number | null][];
   trackStatus: [number, string, string][];

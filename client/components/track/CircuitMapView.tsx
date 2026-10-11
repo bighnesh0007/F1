@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { buildTrack, pathBetween, type Track } from "@/lib/track";
+import { cn } from "@/components/ui";
 import type { CircuitMap } from "@/lib/types";
 
 export type MapCar = {
@@ -151,5 +152,20 @@ export function CarDot({ car, size, onClick, transitionMs }: { car: MapCar; size
         {car.label ?? car.tla}
       </text>}
     </g>
+  );
+}
+
+// A small on/off chip for a map layer (shown under the map).
+export function LayerChip({ on, onClick, disabled, title, children }: { on: boolean; onClick: () => void; disabled?: boolean; title: string; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={on}
+      title={title}
+      className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-semibold transition-opacity disabled:hidden", on ? "border-line bg-surface-2 text-ink" : "border-line text-faint opacity-60")}
+    >
+      {children}
+    </button>
   );
 }
