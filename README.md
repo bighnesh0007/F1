@@ -35,9 +35,9 @@ All configuration lives in one file: copy `.env.example` to `.env` in the projec
 
 **Standings**: drivers, teams, a title-fight calculator ("can they still win it?"), a points simulator for the next race, and teammate head-to-heads.
 
-**Race centre** (`/live`): tap the LIVE badge, "Open race centre" or a live session to open a full view of the session: a big track map with every car, the timing tower, race control messages (filter flags, stewards' decisions, DRS) with the latest one shown over the map, a team radio player (tap to listen, or auto-play new radio as it comes in), a driver to follow (position, gaps to the cars around them, sectors and mini-sectors, tyres, and live speed/gear/throttle/brake with an F1 TV token), pit stops with stationary times, and the live championship during races. On phones each part is a tab.
+**Race centre** (`/live`): tap the LIVE badge, "Open race centre" or a live session to open a full view of the session: a big track map with every car, the timing tower, race control messages (filter flags, stewards' decisions, DRS) with the latest one shown over the map, a team radio player (tap to listen, or auto-play new radio as it comes in), a driver to follow (position, gaps to the cars around them, sectors and mini-sectors, tyres, and live speed/gear/throttle/brake with an F1 TV token), pit stops with stationary times (tagged when made under a safety car), **speed traps**, and the live championship during races. The map uses the exact sector lines and real pit lane learnt from the circuit's last race, draws yellow-flag sectors and puts a short trail behind the cars you follow. On phones each part is a tab.
 
-**More in the race centre**: a pit strategy board (pit window from tyre age, where each car would rejoin if it pitted now, undercut risk), head-to-head with the gap between two drivers lap by lap, all the lap-time/gap/position charts, team radio transcripts (with a speech-to-text service, see below), **Pop out** (timing in a small always-on-top window to keep over your TV stream) and **TV mode** (`/live/tv`, a big-screen layout with a ticker).
+**More in the race centre**: a pit strategy board (pit window from tyre age, where each car would rejoin if it pitted now, undercut risk), head-to-head with the gap between two drivers lap by lap, all the lap-time/gap/position charts, tyre wear per stint, team radio transcripts (with a speech-to-text service, see below), **Pop out** (timing in a small always-on-top window to keep over your TV stream) and **TV mode** (`/live/tv`, a big-screen layout with a ticker).
 
 **Phone notifications**: session about to start, safety car / red flag, and your driver's pit stops, even with the app closed (Settings → Phone notifications; needs VAPID keys, see below).
 
@@ -48,7 +48,14 @@ All configuration lives in one file: copy `.env.example` to `.env` in the projec
 - **Qualifying** (and sprint qualifying): Q1/Q2/Q3 tabs, the time left, the drop zone, and drivers knocked out in each part.
 - **Practice**: ranked by fastest lap, with gaps, laps run and who is out on track.
 
-On the wider track map, a car that stops or retires is marked with a cross where it stopped and then removed from the map. Cars in the pits are faded. Recent race control incidents and track-limit warnings are pinned to the corner they happened at. Click a car or a row to follow that driver.
+The map shows the track coloured by sector (exact sector lines, worked out from where cars are when their sector times appear), the real pit lane (traced from a car's pit stop), yellow-flag sectors, full-throttle zones and a short weather line (air and track temperature, wind, rain). A car that stops or retires is marked where it stopped and then removed. Recent incidents are pinned to their corner. The side panel has tabs for the order, **speed traps** (fastest through each trap), **team radio** (clips play as the replay reaches them, at up to 5×) and race control. Dots under the timeline mark the followed driver's pit stops, places gained or lost and radio; click one to jump there.
+
+**Follow a driver in a replay** (tap a car or a name) to open a panel with three tabs:
+- **Onboard**: speed, gear, throttle, brake, revs and rear wing, in sync with the replay.
+- **Lap**: the lap's speed, throttle and braking along the lap with corner labels, against any other lap (the fastest so far, or another driver's best), with the time gap point by point, top speed, share of the lap at full throttle and short driving notes (lifting before braking, speed dropping at full throttle). The map can show that lap as a **speed map**, and the full-throttle zones then come from its telemetry.
+- **Tyres**: lap time against tyre age for each stint, with the slowdown per lap, and each pit stop with its time in the pit lane, what it cost and whether it was under a safety car.
+
+This uses F1's archived car telemetry, which is published for every finished session. Battery and fuel use are not published, so notes about them are a best guess.
 
 **Profiles**: sign up with [Clerk](https://clerk.com) (email, Google and any other provider you turn on), pick your team tribe (Tifosi, Papaya Army, Silver Arrows…) or let the "which team are you?" quiz decide, set your favourite driver, earn badges, and share a public profile page. Your settings follow you to any device.
 
@@ -316,6 +323,9 @@ Both read the root `.env`. The client reads `SERVER_URL` (default `http://localh
 | `GET /api/drivers` | Current drivers: photos, team colours |
 | `GET /api/replay/sessions?year=` | Finished sessions with archived data |
 | `GET /api/replay?path=` | Replay data for one session |
+| `GET /api/replay/lap?path=&driver=&lap=` | One lap's telemetry (distance, speed, throttle, brake, gear, RPM, DRS, position) |
+| `GET /api/replay/car?path=&driver=` | One car's telemetry through a session, twice a second |
+| `GET /api/circuit-extras?key=` | Sector lines, pit lane and usual pit stop cost for a circuit (from its last race) |
 | `GET /api/auth/me`, `POST /api/auth/refresh` | The signed-in user's app profile (re-synced from Clerk) |
 | `GET/PATCH/DELETE /api/profile`, `PUT /api/profile/settings` | Your profile and synced settings |
 | `GET /api/users/:handle` | Public profile |
