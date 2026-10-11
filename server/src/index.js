@@ -4,6 +4,7 @@ import cors from 'cors';
 import compression from 'compression';
 import * as jolpica from './jolpica.js';
 import * as f1static from './f1static.js';
+import * as replays from './replay.js';
 import { getCircuitMap } from './maps.js';
 import { LiveTimingClient } from './livetiming.js';
 import { connectRedis } from './db/redis.js';
@@ -167,7 +168,10 @@ app.get(
 
 app.get('/api/drivers', route(() => f1static.getLatestDrivers()));
 app.get('/api/replay/sessions', route((req) => f1static.getArchivedSessions(year(req) === 'current' ? new Date().getUTCFullYear() : year(req))));
-app.get('/api/replay', route((req) => f1static.getReplay(String(req.query.path ?? ''))));
+app.get('/api/replay', route((req) => replays.getReplay(String(req.query.path ?? ''))));
+app.get('/api/replay/lap', route((req) => replays.getLapTelemetry(String(req.query.path ?? ''), String(req.query.driver ?? ''), Number(req.query.lap))));
+app.get('/api/replay/car', route((req) => replays.getCarTrace(String(req.query.path ?? ''), String(req.query.driver ?? ''))));
+app.get('/api/circuit-extras', route((req) => replays.getCircuitExtras(req.query.key)));
 app.get(
   '/api/circuit-map',
   route(async (req) => {

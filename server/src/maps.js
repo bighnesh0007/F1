@@ -20,7 +20,7 @@ const OUTLINE_IDS = {
 };
 
 export function getCircuitMap({ key, location, circuitId, year = new Date().getUTCFullYear() }) {
-  return cached(`map:${key}:${location}:${circuitId}:${year}`, DAY, async () => {
+  return cached(`map:v2:${key}:${location}:${circuitId}:${year}`, DAY, async () => {
     if (key) {
       for (const y of [year, year - 1, year - 2]) {
         try {
@@ -52,6 +52,10 @@ function fromMultiViewer(m) {
       y: c.trackPosition?.y,
       angle: c.angle,
     })),
+    // Marshal posts split the lap into the sectors race control waves flags in.
+    marshalSectors: (m.marshalSectors ?? [])
+      .filter((c) => c?.trackPosition)
+      .map((c) => ({ number: c.number, x: c.trackPosition.x, y: c.trackPosition.y })),
   };
 }
 

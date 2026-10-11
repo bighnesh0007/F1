@@ -101,15 +101,17 @@ export function advancing(replay: Replay, part: number) {
 
 // Each driver's completed laps (time, position, gap at the line) and when each was
 // completed, so a replay can show the lap history up to the current moment.
+export type ReplayLap = LapEntry & { tyreAge: number | null };
+
 export function lapHistory(replay: Replay) {
-  const out: Record<string, { t: number; entry: LapEntry }[]> = {};
+  const out: Record<string, { t: number; entry: ReplayLap }[]> = {};
   const state: Board = {};
   for (const [t, n, change] of replay.timing) {
     const row = (state[n] = { ...(state[n] ?? EMPTY_ROW), ...change });
     if (change.laps != null && change.laps > 0) {
       (out[n] ??= []).push({
         t,
-        entry: { lap: change.laps, time: row.last, position: row.p, gap: row.p === 1 ? "LAP" : row.gap, interval: row.int, sectors: [], compound: row.tyre, pit: row.pit, ts: "" },
+        entry: { lap: change.laps, time: row.last, position: row.p, gap: row.p === 1 ? "LAP" : row.gap, interval: row.int, sectors: [], compound: row.tyre, pit: row.pit, ts: "", tyreAge: row.tyreLaps },
       });
     }
   }

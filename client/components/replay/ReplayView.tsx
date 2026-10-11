@@ -1,21 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Flag, History, Loader2, Pause, Play, RotateCcw, Swords, Timer } from "lucide-react";
+import { History, Loader2, Pause, Play, RotateCcw, Swords } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { useNow } from "@/lib/useNow";
 import { useSettings } from "@/lib/settings";
-import { countryFlag, localDay } from "@/lib/format";
+import { countryFlag, localDay, parseLapTime } from "@/lib/format";
 import { TRACK_STATUS } from "@/lib/live";
-import type { ArchivedSession, CircuitMap, Replay } from "@/lib/types";
-import { CarDot, CircuitMapView, LayerChip, SECTOR_COLOURS } from "@/components/track/CircuitMapView";
-import { buildTrack, findStraights, nearestFraction, pathBetween } from "@/lib/track";
+import type { ArchivedSession, CircuitMap, LapTelemetry, Replay } from "@/lib/types";
+import { buildTrack } from "@/lib/track";
 import { CompareView } from "@/components/centre/ComparePanel";
 import { Card, Empty, ErrorNote, Segmented, Skeleton, cn } from "@/components/ui";
-import { flagSwatch } from "@/components/centre/RaceControl";
 import { boardAt, buildCheckpoints, compareCar, kindOf, lapHistory, lastBefore, remainingAt, retirements } from "./board";
-import { PracticeBoard, QualiBoard, RaceBoard } from "./Boards";
 import { QualiCompare } from "./QualiCompare";
+import { ReplayMap } from "./ReplayMap";
+import { ReplaySide, useReplayRadio } from "./ReplaySide";
+import { Timeline } from "./Timeline";
+import { DriverPanel } from "./DriverPanel";
 
 const SPEEDS = [1, 5, 15, 30, 60];
 
@@ -90,10 +91,15 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
   const [focus, setFocus] = useState<string | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [compare, setCompare] = useState<string[]>([]);
+  const [lapChoice, setLapChoice] = useState<number | "fastest">("fastest");
+  const [vs, setVs] = useState<string>("fastest");
   // A tap on a car or a row follows that driver, or in compare mode picks it (two at most).
   const pick = (n: string) => {
     if (compareMode) setCompare((prev) => (prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].slice(-2)));
-    else setFocus((f) => (f === n ? null : n));
+    else {
+      setFocus((f) => (f === n ? null : n));
+      setLapChoice("fastest");
+    }
   };
   const last = useRef<number | null>(null);
   const tRef = useRef(0);
@@ -133,19 +139,47 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
     if (map?.source === "multiviewer") return map;
     return traceFromFrames(replay);
   }, [map, replay]);
-  const [layers, setLayers] = useState({ sectors: true, straights: true });
-  const exact = displayMap?.source === "multiviewer";
-  // Sector boundaries need a map that starts at the finish line (MultiViewer's).
-  const sectorSplits = useMemo<[number, number] | null>(() => {
-    const st = replay?.sectorTimes;
-    if (!exact || !st) return null;
-    const total = st[0] + st[1] + st[2];
-    return [st[0] / total, (st[0] + st[1]) / total];
-  }, [replay, exact]);
-  const straights = useMemo(() => (displayMap ? findStraights(buildTrack(displayMap)) : []), [displayMap]);
+  const track = useMemo(() => (displayMap ? buildTrack(displayMap) : null), [displayMap]);
   const checkpoints = useMemo(() => (replay?.timing ? buildCheckpoints(replay) : null), [replay]);
   const history = useMemo(() => (replay?.timing ? lapHistory(replay) : {}), [replay]);
   const outAt = useMemo(() => (replay?.timing ? retirements(replay) : new Map<string, number>()), [replay]);
+  const radio = useReplayRadio(replay ?? EMPTY_REPLAY, t, playing, speed);
+
+  // The lap shown in the driver panel, and the lap it is compared with. Only laps
+  // completed by this point of the replay count, so nothing is given away early.
+  const panelDriver = compareMode ? compare[0] ?? null : focus;
+  const lapsSoFar = (n: string | null) => (n ? (history[n] ?? []).filter((h) => h.t <= t).map((h) => h.entry) : []);
+  const fastestOf = (n: string | null) => {
+    let best: { lap: number; ms: number } | null = null;
+    for (const l of lapsSoFar(n)) {
+      const ms = l.time ? parseLapTime(l.time) : null;
+      if (ms != null && !l.pit && (!best || ms < best.ms)) best = { lap: l.lap, ms };
+    }
+    return best;
+  };
+  const lapA = panelDriver ? (lapChoice === "fastest" ? fastestOf(panelDriver)?.lap ?? null : lapChoice) : null;
+  const overallFastest = (() => {
+    let best: { n: string; lap: number; ms: number } | null = null;
+    for (const d of replay?.drivers ?? []) {
+      const f = fastestOf(d.number);
+      if (f && (!best || f.ms < best.ms)) best = { n: d.number, ...f };
+    }
+    return best;
+  })();
+  const vsKey = compareMode && compare[1] ? compare[1] : vs;
+  const lapB =
+    vsKey === "none" || !panelDriver
+      ? null
+      : vsKey === "fastest"
+        ? overallFastest && !(overallFastest.n === panelDriver && overallFastest.lap === lapA)
+          ? { n: overallFastest.n, lap: overallFastest.lap }
+          : null
+        : fastestOf(vsKey)
+          ? { n: vsKey, lap: fastestOf(vsKey)!.lap }
+          : null;
+  const lapUrl = (n: string | null, lap: number | null) => (replay && n && lap ? `/api/replay/lap?path=${encodeURIComponent(replay.path)}&driver=${n}&lap=${lap}` : null);
+  const lapAData = useApi<LapTelemetry>(lapUrl(panelDriver, lapA), { keepPrevious: true });
+  const lapBData = useApi<LapTelemetry>(lapUrl(lapB?.n ?? null, lapB?.lap ?? null), { keepPrevious: true });
 
   if (error && !replay) return <ErrorNote message={error} />;
   if (!replay || !checkpoints) {
@@ -159,35 +193,27 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
   const kind = kindOf(replay);
   const racing = kind === "race" || kind === "sprint";
   const qualifying = kind === "quali" || kind === "sprintQuali";
-  const i = Math.min(Math.floor(t / replay.stepMs), replay.frames.length - 1);
-  const k = (t % replay.stepMs) / replay.stepMs;
-  const frame = replay.frames[i];
-  const nextFrame = replay.frames[Math.min(i + 1, replay.frames.length - 1)];
   const board = boardAt(replay, checkpoints, t);
   const lap = lastBefore(replay.laps, t);
   const status = lastBefore(replay.trackStatus, t);
   const part = lastBefore(replay.parts ?? [], t)?.[1] ?? 1;
   const remaining = racing ? null : remainingAt(replay, t);
-  const messages = replay.raceControl.filter((m) => m.t <= t).slice(-6).reverse();
-  const track = status ? TRACK_STATUS[status[1]] : null;
-
-  // Cars that haven't moved for 10 s away from the pits have stopped on track
-  // (unless most of the field has, as on the grid or under a red flag).
-  const still = new Set(replay.drivers.filter((d, idx) => isStill(replay, idx, i) && !board[d.number]?.pit).map((d) => d.number));
-  const stoppedOnTrack = still.size <= 4 ? still : new Set<string>();
-  const incidents = displayMap?.corners.length ? recentIncidents(replay, t) : [];
+  const track_ = status ? TRACK_STATUS[status[1]] : null;
   const comparing = compareMode && compare.length === 2;
-  // A car's interpolated position on screen, or null when it isn't on the map.
-  const carAt = (n: string, trk: { toScreen: (x: number, y: number) => { x: number; y: number } }) => {
-    const idx = replay.drivers.findIndex((d) => d.number === n);
-    const x0 = frame[idx * 2];
-    const y0 = frame[idx * 2 + 1];
-    if (idx < 0 || x0 == null || y0 == null) return null;
-    const x1 = nextFrame[idx * 2] ?? x0;
-    const y1 = nextFrame[idx * 2 + 1] ?? y0;
-    return trk.toScreen(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k);
-  };
+  const highlighted = compareMode ? compare : [focus ?? settings.favouriteDriver].filter((n): n is string => !!n && replay.drivers.some((d) => d.number === n));
+  const driverOf = (n: string | null) => replay.drivers.find((d) => d.number === n) ?? null;
   const sessionLabel = { race: "Race", sprint: "Sprint", quali: "Qualifying", sprintQuali: "Sprint qualifying", practice: "Practice" }[kind];
+  const lapAValid = lapAData.data && lapAData.data.driver === panelDriver && lapAData.data.lap === lapA ? lapAData.data : null;
+  const lapBValid = lapB && lapBData.data && lapBData.data.driver === lapB.n && lapBData.data.lap === lapB.lap ? lapBData.data : null;
+  const vsOptions = [
+    { value: "none", label: "Nothing" },
+    { value: "fastest", label: overallFastest ? `Fastest lap so far (${driverOf(overallFastest.n)?.tla})` : "Fastest lap so far" },
+    ...replay.drivers.filter((d) => d.number !== panelDriver).map((d) => ({ value: d.number, label: `${d.tla}'s fastest lap` })),
+  ];
+  const closeCompare = () => {
+    setCompareMode(false);
+    setCompare([]);
+  };
 
   return (
     <div className="space-y-4">
@@ -203,7 +229,7 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
                 {racing && lap && <span className="tnum rounded-lg bg-surface-2 px-2 py-1 font-bold">Lap {lap[1]}{lap[2] ? `/${lap[2]}` : ""}</span>}
                 {qualifying && <span className="rounded-lg bg-surface-2 px-2 py-1 font-bold">{kind === "sprintQuali" ? "SQ" : "Q"}{part}</span>}
                 {remaining != null && <span className="tnum rounded-lg bg-surface-2 px-2 py-1 font-bold" title="Time left">{countdown(remaining)}</span>}
-                {track && track.tone !== "green" && <span className={cn("rounded-lg px-2 py-1 font-bold uppercase", track.tone === "red" ? "bg-red-600 text-white" : "bg-yellow-400 text-black")}>{track.label}</span>}
+                {track_ && track_.tone !== "green" && <span className={cn("rounded-lg px-2 py-1 font-bold uppercase", track_.tone === "red" ? "bg-red-600 text-white" : "bg-yellow-400 text-black")}>{track_.label}</span>}
                 {(racing || qualifying) && (
                   <button
                     onClick={() => {
@@ -225,72 +251,26 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
                 <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${Math.min(100, (lap[1] / lap[2]) * 100)}%` }} />
               </div>
             ) : null}
-            {displayMap ? (
-              <CircuitMapView
+            {displayMap && track ? (
+              <ReplayMap
+                replay={replay}
                 map={displayMap}
-                className="aspect-[4/3] w-full"
-                showCorners={exact}
-                cornerBadges={exact}
-                trackScale={1.7}
-                sectors={layers.sectors ? sectorSplits : null}
-                straights={layers.straights ? straights : null}
-              >
-                {(trk) => (
-                  <>
-                    {incidents.map((m) => {
-                      const corner = displayMap.corners.find((c) => c.number === m.turn);
-                      if (!corner) return null;
-                      const p = trk.toScreen(corner.x, corner.y);
-                      return <IncidentMarker key={`${m.t}-${m.message}`} x={p.x} y={p.y} size={trk.size} tone={m.tone} label={`T${m.turn} · ${m.label}`} pulse={!settings.reduceMotion} />;
-                    })}
-                    {comparing && racing && (() => {
-                      // The stretch of track from the car behind up to the car ahead.
-                      const [a, b] = compare.map((n) => carAt(n, trk));
-                      if (!a || !b) return null;
-                      const [fa, fb] = [nearestFraction(trk, a), nearestFraction(trk, b)];
-                      const aAhead = (board[compare[0]]?.p ?? 99) < (board[compare[1]]?.p ?? 99);
-                      return <path d={aAhead ? pathBetween(trk, fb, fa) : pathBetween(trk, fa, fb)} fill="none" stroke="var(--accent)" strokeWidth={trk.size / 70} strokeLinecap="round" opacity={0.55} />;
-                    })()}
-                    {replay.drivers.map((d) => {
-                      const p = carAt(d.number, trk);
-                      if (!p) return null;
-                      const row = board[d.number];
-                      // Retired cars show where they stopped for a minute and a half, then leave the map.
-                      if (row?.out) {
-                        const since = t - (outAt.get(d.number) ?? t);
-                        return since < 90_000 ? <StoppedCar key={d.number} x={p.x} y={p.y} size={trk.size} colour={d.teamColour} label={`${d.tla} · OUT`} tone="red" /> : null;
-                      }
-                      if (stoppedOnTrack.has(d.number)) return <StoppedCar key={d.number} x={p.x} y={p.y} size={trk.size} colour={d.teamColour} label={`${d.tla} · stopped`} tone="yellow" />;
-                      const mine = comparing ? compare.includes(d.number) : compareMode ? compare.includes(d.number) || focus === d.number : focus === d.number || (!focus && settings.favouriteDriver === d.number);
-                      const dim = ((row?.pit || row?.ko) && !mine) || (comparing && !mine);
-                      return (
-                        <CarDot
-                          key={d.number}
-                          car={{ number: d.number, tla: d.tla, colour: d.teamColour ?? "888888", x: p.x, y: p.y, highlight: mine, dim, hideLabel: (row?.pit || comparing) && !mine }}
-                          size={trk.size}
-                          onClick={() => pick(d.number)}
-                        />
-                      );
-                    })}
-                  </>
-                )}
-              </CircuitMapView>
+                track={track}
+                t={t}
+                board={board}
+                outAt={outAt}
+                highlighted={highlighted}
+                dimOthers={comparing}
+                onPick={pick}
+                lap={lapAValid}
+                betweenPair={comparing && racing ? [compare[0], compare[1]] : null}
+              />
             ) : (
               <Skeleton className="aspect-[4/3]" />
             )}
-            {displayMap && (sectorSplits || straights.length > 0) && (
-              <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1 text-[11px]">
-                <LayerChip on={layers.sectors} onClick={() => setLayers((l) => ({ ...l, sectors: !l.sectors }))} disabled={!sectorSplits} title="Track coloured by timing sector (boundaries estimated from the session's sector times)">
-                  {SECTOR_COLOURS.map((c, i) => <span key={i} className="h-1.5 w-3 rounded-full" style={{ background: c }} />)} Sectors
-                </LayerChip>
-                <LayerChip on={layers.straights} onClick={() => setLayers((l) => ({ ...l, straights: !l.straights }))} disabled={straights.length === 0} title="Long straights where cars run at full power (worked out from the track shape)">
-                  <span className="h-0 w-4 border-t-2 border-dashed border-green-500" /> Full-power straights
-                </LayerChip>
-              </div>
-            )}
 
-            <div className="mt-2 space-y-3 px-2">
-              <Timeline replay={replay} t={t} duration={duration} onSeek={seek} />
+            <div className="mt-2 space-y-2 px-2">
+              <Timeline replay={replay} t={t} duration={duration} onSeek={seek} focus={compareMode ? null : focus} outAt={outAt} clock={clock} />
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={() => {
@@ -308,37 +288,11 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
                   <Segmented size="sm" value={String(speed)} onChange={(v) => setSpeed(Number(v))} options={SPEEDS.map((s) => ({ value: String(s), label: `${s}×` }))} />
                 </div>
               </div>
+              {!focus && !compareMode && <p className="text-xs text-muted">Tap a car or a name to follow that driver: onboard data, lap telemetry and tyre wear appear below.</p>}
             </div>
           </Card>
 
-          {compareMode && qualifying && (
-
-            <QualiCompare
-
-              replay={replay}
-
-              board={board}
-
-              picked={compare}
-
-              part={part}
-
-              kind={kind}
-
-              onRemove={(n) => setCompare((prev) => prev.filter((x) => x !== n))}
-
-              onClose={() => {
-
-                setCompareMode(false);
-
-                setCompare([]);
-
-              }}
-
-            />
-
-          )}
-
+          {compareMode && qualifying && <QualiCompare replay={replay} board={board} picked={compare} part={part} kind={kind} onRemove={(n) => setCompare((prev) => prev.filter((x) => x !== n))} onClose={closeCompare} />}
           {compareMode && racing && (
             <CompareView
               picked={compare}
@@ -346,150 +300,46 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
               lap={lap?.[1] ?? null}
               total={lap?.[2] ?? null}
               driver={(n) => {
-                const d = replay.drivers.find((x) => x.number === n);
+                const d = driverOf(n);
                 return { tla: d?.tla ?? n, colour: d?.teamColour ?? "888888", fullName: d?.fullName ?? "", headshot: d?.headshot ?? null };
               }}
               onRemove={(n) => setCompare((prev) => prev.filter((x) => x !== n))}
-              onClose={() => {
-                setCompareMode(false);
-                setCompare([]);
-              }}
+              onClose={closeCompare}
+            />
+          )}
+          {panelDriver && driverOf(panelDriver) && (!compareMode || comparing) && (
+            <DriverPanel
+              key={panelDriver}
+              replay={replay}
+              driver={driverOf(panelDriver)!}
+              t={t}
+              laps={lapsSoFar(panelDriver)}
+              lapA={{ data: lapAValid, loading: lapAData.loading, error: lapAData.error }}
+              lapB={{ data: lapBValid, driver: lapB ? driverOf(lapB.n) : null }}
+              lapNumber={lapA}
+              onLapNumber={setLapChoice}
+              vs={vsKey}
+              onVs={setVs}
+              vsOptions={compareMode ? vsOptions.filter((o) => o.value === vsKey) : vsOptions}
+              map={displayMap}
+              onClose={() => (compareMode ? closeCompare() : setFocus(null))}
             />
           )}
         </div>
 
-        <div className="space-y-4">
-          <Card title={racing ? "Running order" : qualifying ? "Qualifying" : "Fastest laps"} icon={racing ? <Flag size={15} /> : <Timer size={15} />}>
-            <div className="scroll-thin -mr-2 max-h-[min(70vh,760px)] overflow-y-auto pr-2">
-              {racing ? (
-                <RaceBoard replay={replay} board={board} focus={compareMode ? compare.at(-1) ?? null : focus} onFocus={pick} />
-              ) : qualifying ? (
-                <QualiBoard replay={replay} board={board} focus={compareMode ? compare.at(-1) ?? null : focus} onFocus={pick} part={part} kind={kind} />
-              ) : (
-                <PracticeBoard replay={replay} board={board} focus={compareMode ? compare.at(-1) ?? null : focus} onFocus={pick} />
-              )}
-            </div>
-          </Card>
-          <Card title="Race control" icon={<Flag size={15} />}>
-            {messages.length === 0 ? <p className="text-sm text-muted">No messages yet.</p> : (
-              <ul className="space-y-2.5 text-sm">
-                {messages.map((m, idx) => {
-                  const swatch = flagSwatch({ Flag: m.flag ?? undefined, Category: m.category, Message: m.message });
-                  return (
-                    <li key={idx} className="flex gap-2.5">
-                      <span className="mt-0.5 h-4 w-6 shrink-0 rounded border border-line" style={swatch ? { background: swatch.bg } : undefined} title={swatch?.label} />
-                      <div className="min-w-0">
-                        <p className="text-xs text-faint">{clock(m.t)}{m.lap ? ` · Lap ${m.lap}` : ""}</p>
-                        <p className="leading-snug">{m.message}</p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Card>
-        </div>
+        <ReplaySide replay={replay} board={board} t={t} kind={kind} part={part} focus={compareMode ? compare.at(-1) ?? null : focus} onPick={pick} radio={radio} speed={speed} clock={clock} />
       </div>
     </div>
   );
 }
 
-// A car that has stopped or retired: a ring with a cross where it came to rest.
-function StoppedCar({ x, y, size, colour, label, tone }: { x: number; y: number; size: number; colour: string; label: string; tone: "red" | "yellow" }) {
-  const r = size / 60;
-  const ring = tone === "red" ? "#ef4444" : "#f59e0b";
-  return (
-    <g transform={`translate(${x} ${y})`} aria-label={label}>
-      <circle r={r * 1.9} fill={ring} opacity={0.18} />
-      <circle r={r} fill={`#${colour}`} stroke={ring} strokeWidth={size / 260} />
-      <path d={`M${-r * 0.45},${-r * 0.45}L${r * 0.45},${r * 0.45}M${r * 0.45},${-r * 0.45}L${-r * 0.45},${r * 0.45}`} stroke="#fff" strokeWidth={size / 320} strokeLinecap="round" />
-      <text x={r * 1.6} y={-r * 1.4} fontSize={size / 46} fontWeight={700} fill={ring} stroke="var(--bg)" strokeWidth={size / 400} paintOrder="stroke" className="font-display select-none">
-        {label}
-      </text>
-    </g>
-  );
-}
-
-// Where race control has just reported something (from "TURN n" in the message).
-function IncidentMarker({ x, y, size, tone, label, pulse }: { x: number; y: number; size: number; tone: "red" | "yellow"; label: string; pulse: boolean }) {
-  const r = size / 45;
-  const colour = tone === "red" ? "#ef4444" : "#f59e0b";
-  return (
-    <g transform={`translate(${x} ${y})`} pointerEvents="none">
-      <circle r={r} fill="none" stroke={colour} strokeWidth={size / 300} opacity={0.9}>
-        {pulse && <animate attributeName="r" values={`${r * 0.6};${r * 1.6}`} dur="1.6s" repeatCount="indefinite" />}
-        {pulse && <animate attributeName="opacity" values="0.9;0" dur="1.6s" repeatCount="indefinite" />}
-      </circle>
-      <path d={`M0,${-r * 0.55}L${r * 0.5},${r * 0.35}L${-r * 0.5},${r * 0.35}Z`} fill={colour} />
-      <text y={-r * 1.1} fontSize={size / 50} textAnchor="middle" fontWeight={700} fill={colour} stroke="var(--bg)" strokeWidth={size / 400} paintOrder="stroke" className="font-display select-none">
-        {label}
-      </text>
-    </g>
-  );
-}
-
-function isStill(replay: Replay, idx: number, i: number, seconds = 10) {
-  const frames = replay.frames;
-  const span = Math.round((seconds * 1000) / replay.stepMs);
-  if (i < span) return false;
-  const x = frames[i][idx * 2];
-  const y = frames[i][idx * 2 + 1];
-  if (x == null || y == null) return false;
-  for (let j = i - span; j < i; j++) {
-    const px = frames[j][idx * 2];
-    const py = frames[j][idx * 2 + 1];
-    if (px == null || py == null || Math.hypot(px - x, py - y) > 60) return false;
-  }
-  return true;
-}
-
-// Race control messages from the last minute that name a corner.
-function recentIncidents(replay: Replay, t: number) {
-  const out: { t: number; message: string; turn: number; label: string; tone: "red" | "yellow" }[] = [];
-  for (const m of replay.raceControl) {
-    if (m.t > t || t - m.t > 60_000) continue;
-    const turn = /\bTURNS? (\d+)/i.exec(m.message)?.[1];
-    if (!turn) continue;
-    const text = m.message.toUpperCase();
-    const label = /STOPPED|CRASH|COLLISION|CONTACT|SPUN|INCIDENT|INVESTIGAT|UNSAFE|IMPED/.test(text)
-      ? /STOPPED/.test(text) ? "Car stopped" : /IMPED/.test(text) ? "Impeding" : "Incident"
-      : /DELETED|TRACK LIMITS/.test(text) ? "Track limits" : null;
-    if (!label) continue;
-    out.push({ t: m.t, message: m.message, turn: Number(turn), label, tone: label === "Track limits" ? "yellow" : "red" });
-  }
-  // One marker per corner (the newest), at most four at once.
-  const byTurn = new Map(out.map((m) => [m.turn, m]));
-  return [...byTurn.values()].slice(-4);
-}
+const EMPTY_REPLAY = { path: "", radio: [] } as unknown as Replay;
 
 function countdown(ms: number) {
   const s = Math.ceil(ms / 1000);
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   return `${h ? `${h}:` : ""}${String(m).padStart(h ? 2 : 1, "0")}:${String(s % 60).padStart(2, "0")} left`;
-}
-
-function Timeline({ replay, t, duration, onSeek }: { replay: Replay; t: number; duration: number; onSeek: (t: number) => void }) {
-  // Coloured bands for safety cars and red flags along the scrubber.
-  const bands = useMemo(() => {
-    const out: { from: number; to: number; tone: string }[] = [];
-    replay.trackStatus.forEach(([st, status], idx) => {
-      const tone = TRACK_STATUS[status]?.tone;
-      if (tone === "sc" || tone === "red") out.push({ from: st, to: replay.trackStatus[idx + 1]?.[0] ?? duration, tone });
-    });
-    return out;
-  }, [replay, duration]);
-  return (
-    <div className="relative">
-      <div className="pointer-events-none absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-surface-3">
-        {bands.map((b, i) => (
-          <span key={i} className={cn("absolute inset-y-0", b.tone === "red" ? "bg-red-500" : "bg-yellow-400")} style={{ left: `${(b.from / duration) * 100}%`, width: `${((b.to - b.from) / duration) * 100}%` }} />
-        ))}
-        <span className="absolute inset-y-0 left-0 bg-accent/70" style={{ width: `${(t / duration) * 100}%` }} />
-      </div>
-      <input type="range" min={0} max={duration} step={1000} value={t} onChange={(e) => onSeek(Number(e.target.value))} className="relative w-full cursor-pointer opacity-0" aria-label="Seek" />
-    </div>
-  );
 }
 
 function traceFromFrames(replay: Replay): CircuitMap | null {

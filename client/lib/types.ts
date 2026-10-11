@@ -92,6 +92,7 @@ export type CircuitMap = {
   rotation: number;
   startsAtFinish: boolean;
   corners: { number: number; letter: string; x: number; y: number; angle: number }[];
+  marshalSectors?: { number: number; x: number; y: number }[];
   length?: number;
 };
 
@@ -152,8 +153,34 @@ export type Replay = {
   clock: [number, number, boolean][]; // [t, remaining ms, counting down]
   laps: [number, number, number | null][];
   trackStatus: [number, string, string][];
-  raceControl: { t: number; message: string; flag: string | null; category: string; lap: number | null; driver: string | null }[];
+  raceControl: { t: number; message: string; flag: string | null; category: string; scope?: string | null; sector?: number | null; lap: number | null; driver: string | null }[];
+  sectorPoints?: [[number, number], [number, number]] | null; // where sectors 2 and 3 start (F1 coordinates)
+  pitLane?: [number, number][] | null; // the pit lane path (F1 coordinates)
+  pitLoss?: number | null; // typical time a pit stop costs here (s)
+  stops?: { t: number; n: string; lap: number; lane: number; loss: number | null; sc: boolean }[];
+  weather?: [number, number | null, number | null, number | null, number | null, number | null, number][]; // [t, air, track, wind dir, wind m/s, humidity, rain]
+  radio?: [number, string, string][]; // [t, driver, clip path]
 };
+
+// One lap of one car, as columns (one entry per telemetry sample).
+export type LapTelemetry = {
+  driver: string;
+  lap: number;
+  lapMs: number;
+  t: number[]; // ms since the lap started
+  d: number[]; // metres since the line
+  speed: number[]; // km/h
+  throttle: number[]; // %
+  brake: number[]; // 0/1
+  gear: number[];
+  rpm: number[];
+  drs: number[];
+  x: (number | null)[];
+  y: (number | null)[];
+};
+
+// One car's telemetry through a whole session, twice a second.
+export type CarTrace = { t: number[]; speed: number[]; throttle: number[]; brake: number[]; gear: number[]; rpm: number[]; drs: number[] };
 
 export type ReplayBoardRow = {
   p: number | null;
@@ -173,6 +200,10 @@ export type ReplayBoardRow = {
   bs1: number | null; // personal best sector times (s)
   bs2: number | null;
   bs3: number | null;
+  st?: number | null; // top speeds through the traps (km/h)
+  fl?: number | null;
+  i1?: number | null;
+  i2?: number | null;
   grid: number | null;
   tyre: string | null;
   fresh: boolean;
