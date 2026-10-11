@@ -24,12 +24,14 @@ export function CircuitMapView({
   showCorners = true,
   children,
   extraPadding = 0,
+  trackScale = 1,
 }: {
   map: CircuitMap;
   className?: string;
   showCorners?: boolean;
   children?: (track: Track) => React.ReactNode;
   extraPadding?: number;
+  trackScale?: number; // wider tarmac, with edges and a centre line, when > 1
 }) {
   const track = useMemo(() => buildTrack(map), [map]);
   const { bounds, size, points } = track;
@@ -41,8 +43,13 @@ export function CircuitMapView({
 
   return (
     <svg viewBox={viewBox} className={className} role="img" aria-label={`Map of ${map.name}`}>
-      <path d={path} fill="none" stroke="var(--surface-3)" strokeWidth={size / 34} strokeLinejoin="round" strokeLinecap="round" />
-      <path d={path} fill="none" stroke="var(--border-strong)" strokeWidth={size / 110} strokeLinejoin="round" strokeLinecap="round" />
+      {trackScale > 1 && <path d={path} fill="none" stroke="var(--border-strong)" strokeWidth={(size / 34) * trackScale + size / 180} strokeLinejoin="round" strokeLinecap="round" opacity={0.7} />}
+      <path d={path} fill="none" stroke="var(--surface-3)" strokeWidth={(size / 34) * trackScale} strokeLinejoin="round" strokeLinecap="round" />
+      {trackScale > 1 ? (
+        <path d={path} fill="none" stroke="var(--border-strong)" strokeWidth={size / 400} strokeDasharray={`${size / 90} ${size / 90}`} strokeLinejoin="round" opacity={0.6} />
+      ) : (
+        <path d={path} fill="none" stroke="var(--border-strong)" strokeWidth={size / 110} strokeLinejoin="round" strokeLinecap="round" />
+      )}
       {finish && <line {...finish} stroke="var(--text)" strokeWidth={size / 160} strokeLinecap="round" />}
       {showCorners &&
         map.corners.map((c) => {

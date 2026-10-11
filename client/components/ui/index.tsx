@@ -59,7 +59,7 @@ export function Segmented<T extends string>({
   onChange,
   size = "md",
 }: {
-  options: { value: T; label: React.ReactNode }[];
+  options: { value: T; label: React.ReactNode; disabled?: boolean }[];
   value: T;
   onChange: (v: T) => void;
   size?: "sm" | "md";
@@ -72,9 +72,10 @@ export function Segmented<T extends string>({
           key={o.value}
           role="tab"
           aria-selected={o.value === value}
+          disabled={o.disabled}
           onClick={() => onChange(o.value)}
           className={cn(
-            "relative rounded-lg font-medium transition-colors",
+            "relative rounded-lg font-medium transition-colors disabled:pointer-events-none disabled:opacity-35",
             size === "sm" ? "px-2.5 py-1 text-xs" : "px-3.5 py-1.5 text-sm",
             o.value === value ? "text-ink" : "text-muted hover:text-ink",
           )}

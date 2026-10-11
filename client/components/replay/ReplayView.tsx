@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Flag, History, Loader2, Pause, Play, RotateCcw } from "lucide-react";
+import { Flag, History, Loader2, Pause, Play, RotateCcw, Timer } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { useNow } from "@/lib/useNow";
 import { useSettings } from "@/lib/settings";
@@ -9,7 +9,10 @@ import { countryFlag, localDay } from "@/lib/format";
 import { TRACK_STATUS } from "@/lib/live";
 import type { ArchivedSession, CircuitMap, Replay } from "@/lib/types";
 import { CarDot, CircuitMapView } from "@/components/track/CircuitMapView";
-import { Card, Empty, ErrorNote, Segmented, Skeleton, TeamBar, cn } from "@/components/ui";
+import { Card, Empty, ErrorNote, Segmented, Skeleton, cn } from "@/components/ui";
+import { flagSwatch } from "@/components/centre/RaceControl";
+import { boardAt, buildCheckpoints, kindOf, lastBefore, remainingAt, retirements } from "./board";
+import { PracticeBoard, QualiBoard, RaceBoard } from "./Boards";
 
 const SPEEDS = [1, 5, 15, 30, 60];
 
@@ -81,6 +84,7 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(15);
+  const [focus, setFocus] = useState<string | null>(null);
   const last = useRef<number | null>(null);
   const tRef = useRef(0);
   const seek = (value: number) => {
@@ -119,9 +123,11 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
     if (map?.source === "multiviewer") return map;
     return traceFromFrames(replay);
   }, [map, replay]);
+  const checkpoints = useMemo(() => (replay?.timing ? buildCheckpoints(replay) : null), [replay]);
+  const outAt = useMemo(() => (replay?.timing ? retirements(replay) : new Map<string, number>()), [replay]);
 
   if (error && !replay) return <ErrorNote message={error} />;
-  if (!replay) {
+  if (!replay || !checkpoints) {
     return (
       <Card>
         <div className="flex items-center gap-3 py-10 text-muted"><Loader2 className="animate-spin" size={18} /> Loading the session. Big races can take a few seconds…</div>
@@ -129,46 +135,87 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
     );
   }
 
+  const kind = kindOf(replay);
+  const racing = kind === "race" || kind === "sprint";
+  const qualifying = kind === "quali" || kind === "sprintQuali";
   const i = Math.min(Math.floor(t / replay.stepMs), replay.frames.length - 1);
   const k = (t % replay.stepMs) / replay.stepMs;
   const frame = replay.frames[i];
   const nextFrame = replay.frames[Math.min(i + 1, replay.frames.length - 1)];
-  const order = orderAt(replay, t);
-  const lap = [...replay.laps].reverse().find(([lt]) => lt <= t);
-  const status = [...replay.trackStatus].reverse().find(([st]) => st <= t);
-  const messages = replay.raceControl.filter((m) => m.t <= t).slice(-4).reverse();
+  const board = boardAt(replay, checkpoints, t);
+  const lap = lastBefore(replay.laps, t);
+  const status = lastBefore(replay.trackStatus, t);
+  const part = lastBefore(replay.parts ?? [], t)?.[1] ?? 1;
+  const remaining = racing ? null : remainingAt(replay, t);
+  const messages = replay.raceControl.filter((m) => m.t <= t).slice(-6).reverse();
   const track = status ? TRACK_STATUS[status[1]] : null;
+
+  // Cars that haven't moved for 10 s away from the pits have stopped on track
+  // (unless most of the field has, as on the grid or under a red flag).
+  const still = new Set(replay.drivers.filter((d, idx) => isStill(replay, idx, i) && !board[d.number]?.pit).map((d) => d.number));
+  const stoppedOnTrack = still.size <= 4 ? still : new Set<string>();
+  const incidents = displayMap?.corners.length ? recentIncidents(replay, t) : [];
+  const sessionLabel = { race: "Race", sprint: "Sprint", quali: "Qualifying", sprintQuali: "Sprint qualifying", practice: "Practice" }[kind];
 
   return (
     <div className="space-y-4">
       <button onClick={onBack} className="text-sm font-medium text-muted hover:text-ink">← All sessions</button>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Card
           title={`${replay.meeting} · ${replay.session}`}
           icon={<History size={15} />}
           right={
-            <div className="flex items-center gap-2 text-xs">
-              {lap && <span className="rounded-lg bg-surface-2 px-2 py-1 font-semibold">Lap {lap[1]}{lap[2] ? `/${lap[2]}` : ""}</span>}
-              {track && track.tone !== "green" && <span className="rounded-lg bg-yellow-400 px-2 py-1 font-bold text-black uppercase">{track.label}</span>}
+            <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
+              <span className={cn("rounded-lg px-2 py-1 font-semibold", racing ? "bg-accent/15 text-accent" : "bg-surface-2 text-muted")}>{sessionLabel}</span>
+              {racing && lap && <span className="tnum rounded-lg bg-surface-2 px-2 py-1 font-bold">Lap {lap[1]}{lap[2] ? `/${lap[2]}` : ""}</span>}
+              {qualifying && <span className="rounded-lg bg-surface-2 px-2 py-1 font-bold">{kind === "sprintQuali" ? "SQ" : "Q"}{part}</span>}
+              {remaining != null && <span className="tnum rounded-lg bg-surface-2 px-2 py-1 font-bold" title="Time left">{countdown(remaining)}</span>}
+              {track && track.tone !== "green" && <span className={cn("rounded-lg px-2 py-1 font-bold uppercase", track.tone === "red" ? "bg-red-600 text-white" : "bg-yellow-400 text-black")}>{track.label}</span>}
             </div>
           }
           bodyClassName="px-2 pb-3"
         >
+          {racing && lap?.[2] ? (
+            <div className="mx-2 mb-1 h-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+              <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${Math.min(100, (lap[1] / lap[2]) * 100)}%` }} />
+            </div>
+          ) : null}
           {displayMap ? (
-            <CircuitMapView map={displayMap} className="aspect-[4/3] w-full" showCorners={displayMap.source === "multiviewer"}>
-              {(trk) =>
-                replay.drivers.map((d, idx) => {
-                  const x0 = frame[idx * 2];
-                  const y0 = frame[idx * 2 + 1];
-                  if (x0 == null || y0 == null) return null;
-                  const x1 = nextFrame[idx * 2] ?? x0;
-                  const y1 = nextFrame[idx * 2 + 1] ?? y0;
-                  const p = trk.toScreen(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k);
-                  const out = order.get(d.number) === 0;
-                  if (out) return null;
-                  return <CarDot key={d.number} car={{ number: d.number, tla: d.tla, colour: d.teamColour ?? "888888", x: p.x, y: p.y, highlight: settings.favouriteDriver === d.number }} size={trk.size} />;
-                })
-              }
+            <CircuitMapView map={displayMap} className="aspect-[4/3] w-full" showCorners={displayMap.source === "multiviewer"} trackScale={1.7}>
+              {(trk) => (
+                <>
+                  {incidents.map((m) => {
+                    const corner = displayMap.corners.find((c) => c.number === m.turn);
+                    if (!corner) return null;
+                    const p = trk.toScreen(corner.x, corner.y);
+                    return <IncidentMarker key={`${m.t}-${m.message}`} x={p.x} y={p.y} size={trk.size} tone={m.tone} label={`T${m.turn} · ${m.label}`} pulse={!settings.reduceMotion} />;
+                  })}
+                  {replay.drivers.map((d, idx) => {
+                    const x0 = frame[idx * 2];
+                    const y0 = frame[idx * 2 + 1];
+                    if (x0 == null || y0 == null) return null;
+                    const x1 = nextFrame[idx * 2] ?? x0;
+                    const y1 = nextFrame[idx * 2 + 1] ?? y0;
+                    const p = trk.toScreen(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k);
+                    const row = board[d.number];
+                    // Retired cars show where they stopped for a minute and a half, then leave the map.
+                    if (row?.out) {
+                      const since = t - (outAt.get(d.number) ?? t);
+                      return since < 90_000 ? <StoppedCar key={d.number} x={p.x} y={p.y} size={trk.size} colour={d.teamColour} label={`${d.tla} · OUT`} tone="red" /> : null;
+                    }
+                    if (stoppedOnTrack.has(d.number)) return <StoppedCar key={d.number} x={p.x} y={p.y} size={trk.size} colour={d.teamColour} label={`${d.tla} · stopped`} tone="yellow" />;
+                    const mine = focus === d.number || (!focus && settings.favouriteDriver === d.number);
+                    return (
+                      <CarDot
+                        key={d.number}
+                        car={{ number: d.number, tla: d.tla, colour: d.teamColour ?? "888888", x: p.x, y: p.y, highlight: mine, dim: (row?.pit || row?.ko) && !mine, hideLabel: row?.pit && !mine }}
+                        size={trk.size}
+                        onClick={() => setFocus(focus === d.number ? null : d.number)}
+                      />
+                    );
+                  })}
+                </>
+              )}
             </CircuitMapView>
           ) : (
             <Skeleton className="aspect-[4/3]" />
@@ -197,30 +244,32 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
         </Card>
 
         <div className="space-y-4">
-          <Card title="Running order">
-            <ol className="space-y-0.5">
-              {replay.drivers
-                .filter((d) => order.get(d.number))
-                .sort((a, b) => order.get(a.number)! - order.get(b.number)!)
-                .map((d) => (
-                  <li key={d.number} className={cn("flex items-center gap-2 rounded-lg px-2 py-1 text-sm", settings.favouriteDriver === d.number && "bg-surface-2 ring-1 ring-accent/50")}>
-                    <span className="w-6 text-center font-display font-bold">{order.get(d.number)}</span>
-                    <TeamBar colour={d.teamColour} />
-                    <span className="font-display font-bold">{d.tla}</span>
-                    <span className="truncate text-xs text-muted">{d.team}</span>
-                  </li>
-                ))}
-            </ol>
+          <Card title={racing ? "Running order" : qualifying ? "Qualifying" : "Fastest laps"} icon={racing ? <Flag size={15} /> : <Timer size={15} />}>
+            <div className="scroll-thin -mr-2 max-h-[min(70vh,760px)] overflow-y-auto pr-2">
+              {racing ? (
+                <RaceBoard replay={replay} board={board} focus={focus} onFocus={(n) => setFocus(focus === n ? null : n)} />
+              ) : qualifying ? (
+                <QualiBoard replay={replay} board={board} focus={focus} onFocus={(n) => setFocus(focus === n ? null : n)} part={part} kind={kind} />
+              ) : (
+                <PracticeBoard replay={replay} board={board} focus={focus} onFocus={(n) => setFocus(focus === n ? null : n)} />
+              )}
+            </div>
           </Card>
           <Card title="Race control" icon={<Flag size={15} />}>
             {messages.length === 0 ? <p className="text-sm text-muted">No messages yet.</p> : (
-              <ul className="space-y-2 text-sm">
-                {messages.map((m, idx) => (
-                  <li key={idx}>
-                    <p className="text-xs text-faint">{clock(m.t)}{m.lap ? ` · Lap ${m.lap}` : ""}</p>
-                    <p>{m.message}</p>
-                  </li>
-                ))}
+              <ul className="space-y-2.5 text-sm">
+                {messages.map((m, idx) => {
+                  const swatch = flagSwatch({ Flag: m.flag ?? undefined, Category: m.category, Message: m.message });
+                  return (
+                    <li key={idx} className="flex gap-2.5">
+                      <span className="mt-0.5 h-4 w-6 shrink-0 rounded border border-line" style={swatch ? { background: swatch.bg } : undefined} title={swatch?.label} />
+                      <div className="min-w-0">
+                        <p className="text-xs text-faint">{clock(m.t)}{m.lap ? ` · Lap ${m.lap}` : ""}</p>
+                        <p className="leading-snug">{m.message}</p>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Card>
@@ -228,6 +277,81 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
       </div>
     </div>
   );
+}
+
+// A car that has stopped or retired: a ring with a cross where it came to rest.
+function StoppedCar({ x, y, size, colour, label, tone }: { x: number; y: number; size: number; colour: string; label: string; tone: "red" | "yellow" }) {
+  const r = size / 60;
+  const ring = tone === "red" ? "#ef4444" : "#f59e0b";
+  return (
+    <g transform={`translate(${x} ${y})`} aria-label={label}>
+      <circle r={r * 1.9} fill={ring} opacity={0.18} />
+      <circle r={r} fill={`#${colour}`} stroke={ring} strokeWidth={size / 260} />
+      <path d={`M${-r * 0.45},${-r * 0.45}L${r * 0.45},${r * 0.45}M${r * 0.45},${-r * 0.45}L${-r * 0.45},${r * 0.45}`} stroke="#fff" strokeWidth={size / 320} strokeLinecap="round" />
+      <text x={r * 1.6} y={-r * 1.4} fontSize={size / 46} fontWeight={700} fill={ring} stroke="var(--bg)" strokeWidth={size / 400} paintOrder="stroke" className="font-display select-none">
+        {label}
+      </text>
+    </g>
+  );
+}
+
+// Where race control has just reported something (from "TURN n" in the message).
+function IncidentMarker({ x, y, size, tone, label, pulse }: { x: number; y: number; size: number; tone: "red" | "yellow"; label: string; pulse: boolean }) {
+  const r = size / 45;
+  const colour = tone === "red" ? "#ef4444" : "#f59e0b";
+  return (
+    <g transform={`translate(${x} ${y})`} pointerEvents="none">
+      <circle r={r} fill="none" stroke={colour} strokeWidth={size / 300} opacity={0.9}>
+        {pulse && <animate attributeName="r" values={`${r * 0.6};${r * 1.6}`} dur="1.6s" repeatCount="indefinite" />}
+        {pulse && <animate attributeName="opacity" values="0.9;0" dur="1.6s" repeatCount="indefinite" />}
+      </circle>
+      <path d={`M0,${-r * 0.55}L${r * 0.5},${r * 0.35}L${-r * 0.5},${r * 0.35}Z`} fill={colour} />
+      <text y={-r * 1.1} fontSize={size / 50} textAnchor="middle" fontWeight={700} fill={colour} stroke="var(--bg)" strokeWidth={size / 400} paintOrder="stroke" className="font-display select-none">
+        {label}
+      </text>
+    </g>
+  );
+}
+
+function isStill(replay: Replay, idx: number, i: number, seconds = 10) {
+  const frames = replay.frames;
+  const span = Math.round((seconds * 1000) / replay.stepMs);
+  if (i < span) return false;
+  const x = frames[i][idx * 2];
+  const y = frames[i][idx * 2 + 1];
+  if (x == null || y == null) return false;
+  for (let j = i - span; j < i; j++) {
+    const px = frames[j][idx * 2];
+    const py = frames[j][idx * 2 + 1];
+    if (px == null || py == null || Math.hypot(px - x, py - y) > 60) return false;
+  }
+  return true;
+}
+
+// Race control messages from the last minute that name a corner.
+function recentIncidents(replay: Replay, t: number) {
+  const out: { t: number; message: string; turn: number; label: string; tone: "red" | "yellow" }[] = [];
+  for (const m of replay.raceControl) {
+    if (m.t > t || t - m.t > 60_000) continue;
+    const turn = /\bTURNS? (\d+)/i.exec(m.message)?.[1];
+    if (!turn) continue;
+    const text = m.message.toUpperCase();
+    const label = /STOPPED|CRASH|COLLISION|CONTACT|SPUN|INCIDENT|INVESTIGAT|UNSAFE|IMPED/.test(text)
+      ? /STOPPED/.test(text) ? "Car stopped" : /IMPED/.test(text) ? "Impeding" : "Incident"
+      : /DELETED|TRACK LIMITS/.test(text) ? "Track limits" : null;
+    if (!label) continue;
+    out.push({ t: m.t, message: m.message, turn: Number(turn), label, tone: label === "Track limits" ? "yellow" : "red" });
+  }
+  // One marker per corner (the newest), at most four at once.
+  const byTurn = new Map(out.map((m) => [m.turn, m]));
+  return [...byTurn.values()].slice(-4);
+}
+
+function countdown(ms: number) {
+  const s = Math.ceil(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return `${h ? `${h}:` : ""}${String(m).padStart(h ? 2 : 1, "0")}:${String(s % 60).padStart(2, "0")} left`;
 }
 
 function Timeline({ replay, t, duration, onSeek }: { replay: Replay; t: number; duration: number; onSeek: (t: number) => void }) {
@@ -251,15 +375,6 @@ function Timeline({ replay, t, duration, onSeek }: { replay: Replay; t: number; 
       <input type="range" min={0} max={duration} step={1000} value={t} onChange={(e) => onSeek(Number(e.target.value))} className="relative w-full cursor-pointer opacity-0" aria-label="Seek" />
     </div>
   );
-}
-
-function orderAt(replay: Replay, t: number) {
-  const positions = new Map<string, number>();
-  for (const [ot, n, pos] of replay.order) {
-    if (ot > t) break;
-    positions.set(n, pos);
-  }
-  return positions;
 }
 
 function traceFromFrames(replay: Replay): CircuitMap | null {

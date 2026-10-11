@@ -144,10 +144,35 @@ export type Replay = {
   startUtc: string | null;
   drivers: { number: string; tla: string; fullName: string; team: string; teamColour: string; headshot: string | null }[];
   frames: (number | null)[][];
-  order: [number, string, number][];
+  // Board changes over time: [t, driver number, changed fields].
+  timing: [number, string, Partial<ReplayBoardRow>][];
+  parts: [number, number][]; // qualifying part (1–3) from time t
+  cutoffs: number[] | null; // cars in each qualifying part
+  clock: [number, number, boolean][]; // [t, remaining ms, counting down]
   laps: [number, number, number | null][];
   trackStatus: [number, string, string][];
-  raceControl: { t: number; message: string; flag: string | null; category: string; lap: number | null }[];
+  raceControl: { t: number; message: string; flag: string | null; category: string; lap: number | null; driver: string | null }[];
+};
+
+export type ReplayBoardRow = {
+  p: number | null;
+  laps: number;
+  best: string | null;
+  last: string | null;
+  gap: string | null;
+  int: string | null;
+  pit: boolean;
+  stops: number;
+  out: boolean;
+  stop: boolean;
+  ko: boolean;
+  q1: string | null;
+  q2: string | null;
+  q3: string | null;
+  grid: number | null;
+  tyre: string | null;
+  fresh: boolean;
+  tyreLaps: number | null;
 };
 
 export type DriverCareer = {

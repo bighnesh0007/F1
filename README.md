@@ -43,7 +43,12 @@ All configuration lives in one file: copy `.env.example` to `.env` in the projec
 
 **Stats**: all-time records (wins, titles, poles, fastest laps), every champion, and season-vs-season comparison.
 
-**Replay**: play back any finished session since 2018 with moving cars, running order, flags and race control messages.
+**Replay**: play back any finished session since 2018 with moving cars, flags and race control messages. The board matches the session:
+- **Race and sprint**: lap counter and progress bar, places gained from the grid, interval or gap to the leader, tyres, pit stops, fastest lap, and retired cars in their own list.
+- **Qualifying** (and sprint qualifying): Q1/Q2/Q3 tabs, the time left, the drop zone, and drivers knocked out in each part.
+- **Practice**: ranked by fastest lap, with gaps, laps run and who is out on track.
+
+On the wider track map, a car that stops or retires is marked with a cross where it stopped and then removed from the map. Cars in the pits are faded. Recent race control incidents and track-limit warnings are pinned to the corner they happened at. Click a car or a row to follow that driver.
 
 **Profiles**: sign up with [Clerk](https://clerk.com) (email, Google and any other provider you turn on), pick your team tribe (Tifosi, Papaya Army, Silver Arrows…) or let the "which team are you?" quiz decide, set your favourite driver, earn badges, and share a public profile page. Your settings follow you to any device.
 
