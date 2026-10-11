@@ -24,3 +24,14 @@ test('replay timeline finds the typical sector times', () => {
   const timing = [1, 2, 3].map((k) => [k * 1000, { Lines: { 1: { Sectors: { 0: { Value: `${30 + k}.0` }, 1: { Value: '40.5' }, 2: { Value: '' } } }, 4: { Sectors: [{ Value: '31.0' }, { Value: '41.0' }, { Value: '25.5' }] } } }]);
   assert.deepEqual(buildTimeline(timing, [], 0).sectorTimes, [31, 41, 25.5]);
 });
+
+test('replay timeline keeps each driver best sector times', () => {
+  const timing = [
+    [1000, { Lines: { 1: { Sectors: [{ Value: '30.5' }, { Value: '40.0' }, { Value: '' }] } } }],
+    [2000, { Lines: { 1: { Sectors: { 0: { Value: '31.2' }, 2: { Value: '25.1' } } } } }],
+    [3000, { Lines: { 1: { Sectors: { 0: { Value: '30.1' } } } } }],
+  ];
+  const rows = buildTimeline(timing, [], 0).timing.filter((r) => r[1] === '1');
+  const last = Object.assign({}, ...rows.map((r) => r[2]));
+  assert.deepEqual([last.bs1, last.bs2, last.bs3], [30.1, 40, 25.1]);
+});

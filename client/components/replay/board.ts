@@ -13,7 +13,7 @@ export function kindOf(replay: Pick<Replay, "type" | "session">): SessionKind {
 
 export const EMPTY_ROW: ReplayBoardRow = {
   p: null, laps: 0, best: null, last: null, gap: null, int: null, pit: false, stops: 0, out: false, stop: false,
-  ko: false, q1: null, q2: null, q3: null, grid: null, tyre: null, fresh: false, tyreLaps: null,
+  ko: false, q1: null, q2: null, q3: null, bs1: null, bs2: null, bs3: null, grid: null, tyre: null, fresh: false, tyreLaps: null,
 };
 
 export type Board = Record<string, ReplayBoardRow>;

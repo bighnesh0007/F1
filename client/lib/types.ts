@@ -170,6 +170,9 @@ export type ReplayBoardRow = {
   q1: string | null;
   q2: string | null;
   q3: string | null;
+  bs1: number | null; // personal best sector times (s)
+  bs2: number | null;
+  bs3: number | null;
   grid: number | null;
   tyre: string | null;
   fresh: boolean;

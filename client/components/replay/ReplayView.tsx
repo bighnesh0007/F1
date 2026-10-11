@@ -15,6 +15,7 @@ import { Card, Empty, ErrorNote, Segmented, Skeleton, cn } from "@/components/ui
 import { flagSwatch } from "@/components/centre/RaceControl";
 import { boardAt, buildCheckpoints, compareCar, kindOf, lapHistory, lastBefore, remainingAt, retirements } from "./board";
 import { PracticeBoard, QualiBoard, RaceBoard } from "./Boards";
+import { QualiCompare } from "./QualiCompare";
 
 const SPEEDS = [1, 5, 15, 30, 60];
 
@@ -203,7 +204,7 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
                 {qualifying && <span className="rounded-lg bg-surface-2 px-2 py-1 font-bold">{kind === "sprintQuali" ? "SQ" : "Q"}{part}</span>}
                 {remaining != null && <span className="tnum rounded-lg bg-surface-2 px-2 py-1 font-bold" title="Time left">{countdown(remaining)}</span>}
                 {track && track.tone !== "green" && <span className={cn("rounded-lg px-2 py-1 font-bold uppercase", track.tone === "red" ? "bg-red-600 text-white" : "bg-yellow-400 text-black")}>{track.label}</span>}
-                {racing && (
+                {(racing || qualifying) && (
                   <button
                     onClick={() => {
                       setCompareMode(!compareMode);
@@ -242,7 +243,7 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
                       const p = trk.toScreen(corner.x, corner.y);
                       return <IncidentMarker key={`${m.t}-${m.message}`} x={p.x} y={p.y} size={trk.size} tone={m.tone} label={`T${m.turn} · ${m.label}`} pulse={!settings.reduceMotion} />;
                     })}
-                    {comparing && (() => {
+                    {comparing && racing && (() => {
                       // The stretch of track from the car behind up to the car ahead.
                       const [a, b] = compare.map((n) => carAt(n, trk));
                       if (!a || !b) return null;
@@ -310,7 +311,35 @@ function Player({ path, onBack }: { path: string; onBack: () => void }) {
             </div>
           </Card>
 
-          {compareMode && (
+          {compareMode && qualifying && (
+
+            <QualiCompare
+
+              replay={replay}
+
+              board={board}
+
+              picked={compare}
+
+              part={part}
+
+              kind={kind}
+
+              onRemove={(n) => setCompare((prev) => prev.filter((x) => x !== n))}
+
+              onClose={() => {
+
+                setCompareMode(false);
+
+                setCompare([]);
+
+              }}
+
+            />
+
+          )}
+
+          {compareMode && racing && (
             <CompareView
               picked={compare}
               cars={compare.filter((n) => board[n]).map((n) => compareCar(n, board[n], history[n], t))}

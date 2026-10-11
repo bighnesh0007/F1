@@ -170,8 +170,14 @@ const lastOf = (obj) => {
 };
 
 // The board fields the replay needs from one driver's TimingData line.
-function timingSummary(line) {
+function timingSummary(line, before = {}) {
   const parts = line.BestLapTimes ?? {};
+  // Personal best time in each sector so far (sector times reset every lap).
+  const bestSector = (i) => {
+    const v = Number(line.Sectors?.[i]?.Value);
+    const prev = before[`bs${i + 1}`] ?? null;
+    return v > 5 && v < 200 && (prev == null || v < prev) ? v : prev;
+  };
   return {
     p: Number(line.Position) || null,
     laps: Number(line.NumberOfLaps) || 0,
@@ -187,6 +193,9 @@ function timingSummary(line) {
     q1: parts[0]?.Value || null,
     q2: parts[1]?.Value || null,
     q3: parts[2]?.Value || null,
+    bs1: bestSector(0),
+    bs2: bestSector(1),
+    bs3: bestSector(2),
   };
 }
 
@@ -209,8 +218,8 @@ function diffStream(stream, summarize, offsetMs) {
     for (const [n, patch] of Object.entries(data.Lines ?? {})) {
       if (!patch || typeof patch !== 'object') continue;
       merge((lines[n] ??= {}), patch);
-      const now = summarize(lines[n]);
       const before = prev[n] ?? {};
+      const now = summarize(lines[n], before);
       const changes = {};
       for (const [k, v] of Object.entries(now)) if (before[k] !== v) changes[k] = v;
       prev[n] = now;
@@ -276,7 +285,7 @@ function parseClock(stream, offsetMs) {
 // race control messages.
 export function getReplay(path) {
   if (!/^\d{4}\/[\w\-.]+\/[\w\-.]+\/$/.test(path)) throw Object.assign(new Error('Invalid session path'), { status: 400 });
-  return cached(`replay:v3:${path}`, DAY, async () => {
+  return cached(`replay:v4:${path}`, DAY, async () => {
     const [info, drivers, position, timing, timingApp, lapCount, clock, trackStatus, rc] = await Promise.all([
       fetchStaticJson(`${path}SessionInfo.json`),
       fetchStaticJson(`${path}DriverList.json`),
