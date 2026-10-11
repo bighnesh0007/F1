@@ -38,36 +38,68 @@ function toCar(row: TowerRow, history: LapEntry[]): CompareCar {
 
 const fmtLap = (ms: number | null) => (ms == null ? "–" : `${Math.floor(ms / 60000)}:${((ms % 60000) / 1000).toFixed(3).padStart(6, "0")}`);
 
-// Two drivers side by side: the live gap between them, whether it is shrinking,
-// and an overtake read worked out from the timing (not an AI guess).
+export type CompareDriver = { tla: string; colour: string; fullName: string; headshot: string | null };
+
+// Live race: builds the two cars from the timing tower and lap history.
 export function ComparePanel({ numbers, onClose, onRemove }: { numbers: string[]; onClose: () => void; onRemove: (n: string) => void }) {
   const { topics } = useLive();
   const { get } = useDrivers();
   const rows = useTowerRows();
   const history = useHistory();
+  const cars = numbers
+    .map((n) => rows.find((r) => r.number === n))
+    .filter((r): r is TowerRow => r != null)
+    .map((r) => toCar(r, history[r.number] ?? []));
+  return (
+    <CompareView
+      picked={numbers}
+      cars={cars}
+      lap={Number(topics.LapCount?.CurrentLap) || null}
+      total={Number(topics.LapCount?.TotalLaps) || null}
+      driver={(n) => get(n)}
+      onClose={onClose}
+      onRemove={onRemove}
+    />
+  );
+}
 
-  if (numbers.length < 2) {
+// Two drivers side by side: the gap between them, whether it is shrinking, and an
+// overtake read worked out from the timing (not an AI guess). Used live and in replays.
+export function CompareView({
+  picked,
+  cars,
+  lap,
+  total,
+  driver,
+  onClose,
+  onRemove,
+}: {
+  picked: string[];
+  cars: CompareCar[];
+  lap: number | null;
+  total: number | null;
+  driver: (n: string) => CompareDriver;
+  onClose: () => void;
+  onRemove: (n: string) => void;
+}) {
+  if (picked.length < 2 || cars.length < 2) {
     return (
       <Card title="Compare" icon={<Swords size={15} />} right={<CloseButton onClose={onClose} />}>
         <p className="py-3 text-center text-sm text-muted">
-          {numbers.length === 0 ? "Tap two cars on the map (or two rows in the timing) to compare them." : `${get(numbers[0]).tla} picked. Tap one more car.`}
+          {picked.length === 0 ? "Tap two cars on the map (or two rows in the timing) to compare them." : `${driver(picked[0]).tla} picked. Tap one more car.`}
         </p>
       </Card>
     );
   }
 
-  const [ra, rb] = numbers.map((n) => rows.find((r) => r.number === n));
-  if (!ra || !rb) return null;
-  const lap = Number(topics.LapCount?.CurrentLap) || null;
-  const total = Number(topics.LapCount?.TotalLaps) || null;
-  const c = compare(toCar(ra, history[ra.number] ?? []), toCar(rb, history[rb.number] ?? []), lap, total);
-  const A = get(c.ahead.number);
-  const B = get(c.behind.number);
+  const c = compare(cars[0], cars[1], lap, total);
+  const A = driver(c.ahead.number);
+  const B = driver(c.behind.number);
   const drs = c.gap != null && c.gap <= 1;
 
   // The gap at the end of each of the last laps, for the little chart.
-  const aheadByLap = new Map((history[c.ahead.number] ?? []).map((l) => [l.lap, l]));
-  const trend = (history[c.behind.number] ?? [])
+  const aheadByLap = new Map(c.ahead.history.map((l) => [l.lap, l]));
+  const trend = c.behind.history
     .map((l) => {
       const o = aheadByLap.get(l.lap);
       const ga = o ? (o.position === 1 ? 0 : Number(String(o.gap ?? "").replace("+", ""))) : NaN;

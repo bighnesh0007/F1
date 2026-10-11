@@ -1,4 +1,6 @@
 import type { Replay, ReplayBoardRow } from "@/lib/types";
+import type { LapEntry } from "@/lib/live";
+import type { CompareCar } from "@/lib/compare";
 
 export type SessionKind = "race" | "sprint" | "quali" | "sprintQuali" | "practice";
 
@@ -95,4 +97,34 @@ export function advancing(replay: Replay, part: number) {
   if (part === 1) return n - (n > 20 ? 6 : 5);
   if (part === 2) return 10;
   return null;
+}
+
+// Each driver's completed laps (time, position, gap at the line) and when each was
+// completed, so a replay can show the lap history up to the current moment.
+export function lapHistory(replay: Replay) {
+  const out: Record<string, { t: number; entry: LapEntry }[]> = {};
+  const state: Board = {};
+  for (const [t, n, change] of replay.timing) {
+    const row = (state[n] = { ...(state[n] ?? EMPTY_ROW), ...change });
+    if (change.laps != null && change.laps > 0) {
+      (out[n] ??= []).push({
+        t,
+        entry: { lap: change.laps, time: row.last, position: row.p, gap: row.p === 1 ? "LAP" : row.gap, interval: row.int, sectors: [], compound: row.tyre, pit: row.pit, ts: "" },
+      });
+    }
+  }
+  return out;
+}
+
+export function compareCar(number: string, row: ReplayBoardRow, history: { t: number; entry: LapEntry }[] | undefined, t: number): CompareCar {
+  return {
+    number,
+    position: row.p ?? 99,
+    gapToLeader: row.p === 1 ? "LAP" : row.gap,
+    interval: row.int,
+    compound: row.tyre,
+    tyreAge: row.tyreLaps,
+    stops: row.stops,
+    history: (history ?? []).filter((h) => h.t <= t).map((h) => h.entry),
+  };
 }

@@ -6,7 +6,7 @@ import { useLive } from "@/lib/live-context";
 import { useDrivers } from "@/lib/drivers";
 import { useSettings } from "@/lib/settings";
 import { useApi } from "@/lib/useApi";
-import { buildTrack, estimateFraction, findStraights, offsetAt, pathBetween, type Track } from "@/lib/track";
+import { buildTrack, estimateFraction, findStraights, nearestFraction, offsetAt, pathBetween, type Track } from "@/lib/track";
 import { list, type CarProgress, type LiveEvent } from "@/lib/live";
 import type { CircuitMap } from "@/lib/types";
 import { CarDot, CircuitMapView, LayerChip, SECTOR_COLOURS } from "@/components/track/CircuitMapView";
@@ -184,19 +184,6 @@ function RealCars({ track, entries, onSelect, focus, compare }: { track: Track; 
       ))}
     </g>
   );
-}
-
-function nearestFraction(track: Track, p: { x: number; y: number }) {
-  let best = 0;
-  let bestD = Infinity;
-  track.points.forEach((q, i) => {
-    const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
-    if (d < bestD) {
-      bestD = d;
-      best = i;
-    }
-  });
-  return track.fractions[best];
 }
 
 // Cars placed by estimated lap progress, animated every frame.

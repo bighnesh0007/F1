@@ -141,3 +141,17 @@ export function findStraights(track: Track, minShare = 0.05, maxTurnDeg = 14): [
     .filter(([a, b]) => b - a >= minShare)
     .map(([a, b]) => [a % 1, b % 1]);
 }
+
+// The lap fraction of the track point closest to a screen point.
+export function nearestFraction(track: Track, p: Pt) {
+  let best = 0;
+  let bestD = Infinity;
+  track.points.forEach((q, i) => {
+    const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  });
+  return track.fractions[best];
+}
