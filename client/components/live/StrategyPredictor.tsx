@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Flag, Info } from "lucide-react";
 import { useLive } from "@/lib/live-context";
+import { useCircuitExtras } from "@/lib/circuitExtras";
 import { useDrivers } from "@/lib/drivers";
 import { list, TYRES } from "@/lib/live";
 import { Empty, TeamBar, Tyre, cn } from "@/components/ui";
@@ -98,11 +99,14 @@ export function predictStrategy(rows: { number: string; position: number; timing
 
 export function StrategyPredictor({ focus }: { focus?: string | null }) {
   const { topics } = useLive();
+  const extras = useCircuitExtras(topics.SessionInfo?.Meeting?.Circuit?.Key);
   const { get } = useDrivers();
   const tower = useTowerRows();
   const totalLaps = Number(topics.LapCount?.TotalLaps) || 0;
   const currentLap = Number(topics.LapCount?.CurrentLap) || 0;
-  const loss = pitLossSeconds(topics);
+  const laneLoss = pitLossSeconds(topics);
+  // The time a stop really costs here (measured at this circuit's last race) beats an estimate.
+  const loss = !laneLoss.measured && extras?.pitLoss ? { seconds: extras.pitLoss, measured: false, from: extras.from } : { ...laneLoss, from: null as string | null };
   const rows = predictStrategy(
     tower.map((r) => ({ number: r.number, position: r.position, timing: r.timing, stints: list(topics.TimingAppData?.Lines?.[r.number]?.Stints) })),
     totalLaps,
@@ -117,7 +121,7 @@ export function StrategyPredictor({ focus }: { focus?: string | null }) {
         <Info size={14} className="mt-0.5 shrink-0" />
         <span>
           Estimates from tyre age and typical stint lengths. A stop costs about <b className="text-ink">{loss.seconds.toFixed(1)}s</b>
-          {loss.measured ? " (measured in this race)" : " (typical; updated once cars pit)"}. &ldquo;If they pit now&rdquo; shows where they would rejoin.
+          {loss.measured ? " (measured in this race)" : loss.from ? ` (measured at ${loss.from}; updated once cars pit)` : " (typical; updated once cars pit)"}. &ldquo;If they pit now&rdquo; shows where they would rejoin.
         </span>
       </p>
       <div className="scroll-thin overflow-x-auto">

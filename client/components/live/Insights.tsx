@@ -11,8 +11,9 @@ import { formatLapTime, parseLapTime } from "@/lib/format";
 import { Card, Empty, Segmented, TeamBar, cn } from "@/components/ui";
 import { gapSeconds, useTowerRows } from "./TimingTower";
 import { StrategyPredictor } from "./StrategyPredictor";
+import { TyreWear } from "./TyreWear";
 
-type Tab = "gaps" | "laps" | "positions" | "strategy" | "pits" | "h2h";
+type Tab = "gaps" | "laps" | "positions" | "strategy" | "wear" | "pits" | "h2h";
 const MAX_HIGHLIGHT = 5;
 
 export function Insights({ focus = null }: { focus?: string | null }) {
@@ -41,6 +42,7 @@ export function Insights({ focus = null }: { focus?: string | null }) {
     { value: "laps", label: "Lap times" },
     ...(race ? [{ value: "positions" as Tab, label: "Positions" }] : []),
     { value: "strategy", label: "Tyres" },
+    { value: "wear", label: "Tyre wear" },
     ...(race ? [{ value: "pits" as Tab, label: "Pit strategy" }] : []),
     { value: "h2h", label: "Head-to-head" },
   ];
@@ -48,11 +50,12 @@ export function Insights({ focus = null }: { focus?: string | null }) {
 
   return (
     <Card title="Insights" icon={<LineIcon size={15} />} right={<div className="max-w-full overflow-x-auto"><Segmented size="sm" value={active} onChange={setTab} options={tabs} /></div>}>
-      {active !== "strategy" && active !== "h2h" && active !== "pits" && <DriverChips rows={rows.map((r) => r.number)} selected={selected} onToggle={toggle} />}
+      {active !== "strategy" && active !== "h2h" && active !== "pits" && active !== "wear" && <DriverChips rows={rows.map((r) => r.number)} selected={selected} onToggle={toggle} />}
       {active === "gaps" && <GapChart selected={selected} />}
       {active === "laps" && <LapChart selected={selected} />}
       {active === "positions" && <PositionChart selected={selected} />}
       {active === "strategy" && <StrategyChart />}
+      {active === "wear" && <WearForDriver number={focus ?? selected[0] ?? null} />}
       {active === "pits" && <StrategyPredictor focus={focus} />}
       {active === "h2h" && <HeadToHead initial={focus ? [focus, rivalOf(rows.map((r) => r.number), focus)] : [selected[0], selected[1]]} key={focus ?? ""} />}
     </Card>
@@ -89,6 +92,19 @@ function DriverChips({ rows, selected, onToggle }: { rows: string[]; selected: s
 }
 
 // ---- data helpers ---------------------------------------------------------------
+
+// Tyre wear for the followed driver (or the first highlighted one).
+function WearForDriver({ number }: { number: string | null }) {
+  const history = useLapHistory();
+  const { get } = useDrivers();
+  if (!number) return <Empty title="Pick a driver to see their tyre wear" />;
+  return (
+    <div>
+      <p className="mb-2 text-sm font-semibold">{get(number).fullName}</p>
+      <TyreWear laps={history[number] ?? []} />
+    </div>
+  );
+}
 
 function useLapHistory() {
   const { topics } = useLive();

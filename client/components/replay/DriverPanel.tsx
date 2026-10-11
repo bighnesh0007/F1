@@ -4,11 +4,11 @@ import { useMemo, useState } from "react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChevronLeft, ChevronRight, Gauge, Loader2, X } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { TYRES } from "@/lib/live";
-import { formatLapTime, parseLapTime } from "@/lib/format";
+import { formatLapTime } from "@/lib/format";
+import { TyreWear } from "@/components/live/TyreWear";
 import { alignLaps, drivingNotes, fullThrottleShare, traceAt, wingOpen } from "@/lib/telemetry";
 import type { CarTrace, CircuitMap, LapTelemetry, Replay } from "@/lib/types";
-import { Card, Headshot, Segmented, Tyre, cn } from "@/components/ui";
+import { Card, Headshot, Segmented, cn } from "@/components/ui";
 import type { ReplayLap } from "./board";
 
 type Driver = Replay["drivers"][number];
@@ -346,51 +346,10 @@ function BrakeStrip({ points, names }: { points: Point[]; names: [string, string
 // --- Tyres -------------------------------------------------------------------
 
 function TyreView({ replay, driver, laps, t }: { replay: Replay; driver: Driver; laps: ReplayLap[]; t: number }) {
-  const stints = useMemo(() => wearByStint(laps), [laps]);
   const stops = (replay.stops ?? []).filter((s) => s.n === driver.number && s.t <= t);
-  const colours = ["var(--series-1)", "var(--series-2)", "var(--series-3)"];
-  const data = useMemo(() => {
-    const rows: Record<number, Record<string, number>> = {};
-    stints.forEach((s, i) => s.points.forEach((p) => ((rows[p.age] ??= { age: p.age })[`s${i}`] = p.time)));
-    return Object.values(rows).sort((x, y) => x.age - y.age);
-  }, [stints]);
-
   return (
     <div className="space-y-4">
-      {stints.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted">Tyre wear shows once a few clean laps are done on a set.</p>
-      ) : (
-        <>
-          <div className="flex flex-wrap gap-3 text-xs">
-            {stints.slice(0, 3).map((s, i) => (
-              <span key={i} className="flex items-center gap-1.5 font-semibold">
-                <span className="h-0.5 w-5 rounded-full" style={{ background: colours[i] }} />
-                <Tyre compound={s.compound} size={16} /> Stint {s.index} · {TYRES[s.compound ?? ""]?.name ?? "Unknown"}
-                {s.slope != null && <span className="font-normal text-muted">({s.slope >= 0 ? "+" : "−"}{Math.abs(s.slope).toFixed(2)} s per lap)</span>}
-              </span>
-            ))}
-          </div>
-          <div style={{ height: 200 }}>
-            <ResponsiveContainer>
-              <LineChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: -10 }}>
-                <CartesianGrid stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="age" type="number" domain={["dataMin", "dataMax"]} tick={{ fontSize: 10, fill: "var(--faint)" }} tickLine={false} axisLine={false} label={{ value: "Laps on the tyres", position: "insideBottom", offset: -2, fontSize: 10, fill: "var(--faint)" }} height={30} />
-                <YAxis domain={["dataMin - 0.3", "dataMax + 0.3"]} tickFormatter={(v) => formatLapTime(Number(v))} tick={{ fontSize: 10, fill: "var(--faint)" }} tickLine={false} axisLine={false} width={64} />
-                <Tooltip
-                  contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12 }}
-                  labelFormatter={(a) => `${a} laps on the tyres`}
-                  formatter={(v, k) => [formatLapTime(Number(v)), `Stint ${stints[Number(String(k).slice(1))]?.index ?? ""}`]}
-                />
-                {stints.slice(0, 3).map((_, i) => (
-                  <Line key={i} dataKey={`s${i}`} type="monotone" stroke={colours[i]} strokeWidth={2} dot={{ r: 3, strokeWidth: 0, fill: colours[i] }} isAnimationActive={false} connectNulls />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="text-xs text-muted">A rising line means the tyres are wearing and the car is getting slower. Pit and slow laps are left out.</p>
-        </>
-      )}
-
+      <TyreWear laps={laps} />
       {stops.length > 0 && (
         <div>
           <p className="mb-1 text-xs font-semibold text-muted">Pit stops</p>
@@ -409,43 +368,6 @@ function TyreView({ replay, driver, laps, t }: { replay: Replay; driver: Driver;
       )}
     </div>
   );
-}
-
-// Lap time against tyre age for each stint, without pit and slow laps, with the
-// average change per lap (least-squares slope).
-export function wearByStint(laps: ReplayLap[]) {
-  const clean = laps.filter((l) => l.time && l.tyreAge != null && !l.pit);
-  const best = Math.min(...clean.map((l) => parseLapTime(l.time) ?? Infinity));
-  const stints: { index: number; compound: string | null; points: { age: number; time: number }[]; slope: number | null }[] = [];
-  // A new stint starts when the compound changes or the reported tyre age drops.
-  // Age is counted lap by lap within the stint (from the age the set started at),
-  // since the feed's own age can lag.
-  let prevAge = Infinity;
-  let startAge = 0;
-  let count = 0;
-  for (const l of clean) {
-    const time = parseLapTime(l.time);
-    const newStint = l.tyreAge! < prevAge || l.compound !== stints.at(-1)?.compound;
-    if (newStint) {
-      stints.push({ index: stints.length + 1, compound: l.compound, points: [], slope: null });
-      startAge = l.tyreAge!;
-      count = 0;
-    }
-    prevAge = l.tyreAge!;
-    count++;
-    if (time == null || time > best * 1.07) continue;
-    stints.at(-1)!.points.push({ age: Math.max(l.tyreAge!, startAge + count), time });
-  }
-  for (const s of stints) {
-    const n = s.points.length;
-    if (n < 3) continue;
-    const mx = s.points.reduce((a, p) => a + p.age, 0) / n;
-    const my = s.points.reduce((a, p) => a + p.time, 0) / n;
-    const num = s.points.reduce((a, p) => a + (p.age - mx) * (p.time - my), 0);
-    const den = s.points.reduce((a, p) => a + (p.age - mx) ** 2, 0);
-    s.slope = den ? num / den : null;
-  }
-  return stints.filter((s) => s.points.length >= 2);
 }
 
 function Loading({ text }: { text: string }) {

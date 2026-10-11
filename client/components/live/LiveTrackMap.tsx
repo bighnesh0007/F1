@@ -10,6 +10,9 @@ import { buildTrack, estimateFraction, findStraights, nearestFraction, offsetAt,
 import { list, type CarProgress, type LiveEvent } from "@/lib/live";
 import type { CircuitMap } from "@/lib/types";
 import { CarDot, CircuitMapView, LayerChip, SECTOR_COLOURS } from "@/components/track/CircuitMapView";
+import { FlagOverlay, PitLanePath, sectorFractions as exactSectorFractions } from "@/components/track/overlays";
+import { useCircuitExtras } from "@/lib/circuitExtras";
+import { yellowSectors } from "@/lib/flags";
 import { Card, Empty, Skeleton, cn } from "@/components/ui";
 
 const SLOW_TRACK_STATUSES = new Set(["4", "6", "7"]);
@@ -75,8 +78,23 @@ export function LiveTrackMap({
     );
 
   const lines = topics.TimingData?.Lines;
-  const sectorSplits = useMemo(() => sectorFractions(lines), [lines]);
   const exact = displayMap?.source === "multiviewer";
+  const extras = useCircuitExtras(key);
+  const estimated = useMemo(() => estimatedSectorFractions(lines), [lines]);
+  // Exact sector lines (learnt from this circuit's last race) when known, else estimated from sector times.
+  const sectorSplits = useMemo(() => {
+    if (exact && displayMap && extras?.sectorPoints) {
+      const exactSplits = exactSectorFractions(buildFor(displayMap), extras.sectorPoints, null);
+      if (exactSplits) return exactSplits;
+    }
+    return estimated;
+  }, [exact, displayMap, extras, estimated]);
+  const rcMessages = topics.RaceControlMessages?.Messages;
+  const flags = useMemo(
+    () => yellowSectors(list<{ Flag?: string; Scope?: string; Sector?: number }>(rcMessages).map((m) => ({ flag: m.Flag, scope: m.Scope, sector: m.Sector }))),
+    [rcMessages],
+  );
+  const realPit = extras?.pitLane ?? null;
   const straights = useMemo(() => (displayMap && exact ? findStraights(buildFor(displayMap)) : []), [displayMap, exact]);
 
   const header = (
@@ -114,13 +132,18 @@ export function LiveTrackMap({
             cornerBadges={exact}
             sectors={exact && layers.sectors ? sectorSplits : null}
             straights={layers.straights ? straights : null}
-            under={(track) => (exact && !realMode && layers.pit ? <PitLaneShape track={track} /> : null)}
+            under={(track) => (
+              <>
+                {exact && layers.pit && (realPit ? <PitLanePath track={track} points={realPit} /> : !realMode && <PitLaneShape track={track} />)}
+                {exact && <FlagOverlay track={track} map={displayMap} active={flags} />}
+              </>
+            )}
           >
             {(track) =>
               realMode ? (
                 <RealCars track={track} entries={entries} onSelect={onSelect} focus={focus} compare={compare} />
               ) : (
-                <EstimatedCars track={track} onSelect={onSelect} focus={focus} compare={compare} pitOnMap={exact && layers.pit} />
+                <EstimatedCars track={track} onSelect={onSelect} focus={focus} compare={compare} pitOnMap={exact && layers.pit} pitLane={realPit} />
               )
             }
           </CircuitMapView>
@@ -134,14 +157,14 @@ export function LiveTrackMap({
       )}
       {displayMap && exact && (
         <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1 text-[11px]">
-          <LayerChip on={layers.sectors} onClick={() => setLayers((l) => ({ ...l, sectors: !l.sectors }))} disabled={!sectorSplits} title="Track coloured by timing sector (boundaries estimated from sector times)">
+          <LayerChip on={layers.sectors} onClick={() => setLayers((l) => ({ ...l, sectors: !l.sectors }))} disabled={!sectorSplits} title={extras?.sectorPoints ? `Track coloured by timing sector (sector lines from ${extras.from})` : "Track coloured by timing sector (boundaries estimated from sector times)"}>
             {SECTOR_COLOURS.map((c, i) => <span key={i} className="h-1.5 w-3 rounded-full" style={{ background: c }} />)} Sectors
           </LayerChip>
           <LayerChip on={layers.straights} onClick={() => setLayers((l) => ({ ...l, straights: !l.straights }))} disabled={straights.length === 0} title="Long straights where cars run at full power (worked out from the track shape)">
             <span className="h-0 w-4 border-t-2 border-dashed border-green-500" /> Full-power straights
           </LayerChip>
           {!realMode && (
-            <LayerChip on={layers.pit} onClick={() => setLayers((l) => ({ ...l, pit: !l.pit }))} title="Cars in the pits move along the pit lane (drawn approximately)">
+            <LayerChip on={layers.pit} onClick={() => setLayers((l) => ({ ...l, pit: !l.pit }))} title={realPit ? `Cars in the pits move along the pit lane (traced at ${extras?.from})` : "Cars in the pits move along the pit lane (drawn approximately)"}>
               <span className="h-0 w-4 border-t-2 border-dotted border-yellow" /> Pit lane
             </LayerChip>
           )}
@@ -187,7 +210,7 @@ function RealCars({ track, entries, onSelect, focus, compare }: { track: Track; 
 }
 
 // Cars placed by estimated lap progress, animated every frame.
-function EstimatedCars({ track, onSelect, focus, compare, pitOnMap }: { track: Track; onSelect: (n: string) => void; focus: string | null; compare: string[]; pitOnMap: boolean }) {
+function EstimatedCars({ track, onSelect, focus, compare, pitOnMap, pitLane }: { track: Track; onSelect: (n: string) => void; focus: string | null; compare: string[]; pitOnMap: boolean; pitLane: [number, number][] | null }) {
   const { topics, feedNow } = useLive();
   const { get } = useDrivers();
   const { settings } = useSettings();
@@ -196,6 +219,15 @@ function EstimatedCars({ track, onSelect, focus, compare, pitOnMap }: { track: T
   const slow = SLOW_TRACK_STATUSES.has(String(topics.TrackStatus?.Status)) ? 1.4 : 1;
   const refs = useRef(new Map<string, SVGGElement>());
   const between = useRef<SVGPathElement>(null);
+  const trails = useRef(new Map<string, SVGPathElement>());
+  // The real pit lane in screen space, with the distance along it at each point.
+  const pitPath = useMemo(() => {
+    if (!pitLane || pitLane.length < 2) return null;
+    const pts = pitLane.map(([x, y]) => track.toScreen(x, y));
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+    return { pts, cum, total: cum.at(-1) || 1 };
+  }, [pitLane, track]);
 
   // When each car went into the pits, and the usual time in the lane here.
   const pitIns = useMemo(() => {
@@ -211,10 +243,10 @@ function EstimatedCars({ track, onSelect, focus, compare, pitOnMap }: { track: T
     return times.length ? times[Math.floor(times.length / 2)] : DEFAULT_LANE_S;
   }, [topics.PitLaneTimeCollection]);
 
-  const state = useRef({ progress, slow, lines, pitIns, laneS, compare, pitOnMap });
+  const state = useRef({ progress, slow, lines, pitIns, laneS, compare, pitOnMap, pitPath });
   useEffect(() => {
-    state.current = { progress, slow, lines, pitIns, laneS, compare, pitOnMap };
-  }, [progress, slow, lines, pitIns, laneS, compare, pitOnMap]);
+    state.current = { progress, slow, lines, pitIns, laneS, compare, pitOnMap, pitPath };
+  }, [progress, slow, lines, pitIns, laneS, compare, pitOnMap, pitPath]);
 
   useEffect(() => {
     let frame = 0;
@@ -231,7 +263,7 @@ function EstimatedCars({ track, onSelect, focus, compare, pitOnMap }: { track: T
           // In the pits: move along the pit lane by the time since the car came in.
           const since = st.pitIns.get(n);
           const k = line?.PitOut ? 0.95 : since ? Math.min(0.9, Math.max(0, (now - since) / 1000 / st.laneS)) : 0.5;
-          pt = offsetAt(track, -PIT_WINDOW + 2 * PIT_WINDOW * k, pitOffset);
+          pt = st.pitPath ? along(st.pitPath, k) : offsetAt(track, -PIT_WINDOW + 2 * PIT_WINDOW * k, pitOffset);
         } else {
           const f = p ? estimateFraction(p, now, st.slow) : null;
           if (f == null) continue;
@@ -239,6 +271,11 @@ function EstimatedCars({ track, onSelect, focus, compare, pitOnMap }: { track: T
           pt = track.at(f);
         }
         el.style.transform = `translate(${pt.x}px, ${pt.y}px)`;
+      }
+      // Trails: the last stretch of track behind each followed car.
+      for (const [n, path] of trails.current) {
+        const f = fractions.get(n);
+        path.setAttribute("d", f != null ? pathBetween(track, f - 0.018, f, 0, 14) : "");
       }
       if (between.current) {
         const [a, b] = st.compare;
@@ -264,6 +301,21 @@ function EstimatedCars({ track, onSelect, focus, compare, pitOnMap }: { track: T
   return (
     <g>
       {comparing && <path ref={between} fill="none" stroke="var(--accent)" strokeWidth={track.size / 70} strokeLinecap="round" opacity={0.55} />}
+      {!settings.reduceMotion &&
+        numbers.filter(hi).map((n) => (
+          <path
+            key={`trail-${n}`}
+            ref={(el) => {
+              if (el) trails.current.set(n, el);
+              else trails.current.delete(n);
+            }}
+            fill="none"
+            stroke={`#${get(n).colour}`}
+            strokeWidth={track.size / 90}
+            strokeLinecap="round"
+            opacity={0.35}
+          />
+        ))}
       {numbers.map((n) => {
         const d = get(n);
         const pit = Boolean(progress?.[n]?.pit || lines[n]?.InPit);
@@ -288,6 +340,16 @@ function EstimatedCars({ track, onSelect, focus, compare, pitOnMap }: { track: T
   );
 }
 
+// The point a fraction k (0-1) of the way along a polyline.
+function along(path: { pts: { x: number; y: number }[]; cum: number[]; total: number }, k: number) {
+  const target = Math.min(1, Math.max(0, k)) * path.total;
+  let i = 1;
+  while (i < path.cum.length - 1 && path.cum[i] < target) i++;
+  const span = path.cum[i] - path.cum[i - 1] || 1;
+  const r = (target - path.cum[i - 1]) / span;
+  return { x: path.pts[i - 1].x + (path.pts[i].x - path.pts[i - 1].x) * r, y: path.pts[i - 1].y + (path.pts[i].y - path.pts[i - 1].y) * r };
+}
+
 // A dotted lane beside the start/finish straight, labelled PIT.
 function PitLaneShape({ track }: { track: Track }) {
   const offset = (track.size / 34) * 1.5 * 1.7;
@@ -306,7 +368,7 @@ function PitLaneShape({ track }: { track: Track }) {
 
 // Where sectors 2 and 3 start, as lap fractions, from the drivers' sector times
 // (median across the field, so one slow lap doesn't move the boundaries).
-function sectorFractions(lines: Record<string, { Sectors?: Record<string, { Value?: string; PreviousValue?: string }> }> | undefined): [number, number] | null {
+function estimatedSectorFractions(lines: Record<string, { Sectors?: Record<string, { Value?: string; PreviousValue?: string }> }> | undefined): [number, number] | null {
   const s1: number[] = [];
   const s2: number[] = [];
   const s3: number[] = [];

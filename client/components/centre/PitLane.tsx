@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Timer, Wrench } from "lucide-react";
 import { useLive } from "@/lib/live-context";
@@ -38,7 +39,8 @@ export function PitLane({ onSelect, focus }: { onSelect: (n: string) => void; fo
       const progress = r.timing?.PitOut ? 0.92 : elapsed != null ? Math.min(0.85, elapsed / laneS) : 0.5;
       return { row: r, elapsed, progress };
     });
-  const recent = stops.slice(0, 4);
+  const [all, setAll] = useState(false);
+  const recent = all ? stops : stops.slice(0, 4);
 
   if (inLane.length === 0 && recent.length === 0) {
     return (
@@ -92,6 +94,7 @@ export function PitLane({ onSelect, focus }: { onSelect: (n: string) => void; fo
                       {s.stationary != null && <span className="font-semibold text-ink"><Timer size={11} className="mr-0.5 inline" />{s.stationary.toFixed(1)}s</span>}
                       {s.lane != null && ` · lane ${s.lane.toFixed(1)}s`}
                       {s.change ? <span className={s.change > 0 ? "text-good" : "text-bad"}> · {s.change > 0 ? `+${s.change}` : s.change}</span> : null}
+                      {s.sc && <span className="ml-1 rounded bg-yellow/20 px-1 text-[10px] font-bold text-yellow">SC/VSC</span>}
                     </p>
                   </div>
                   {s.compound && <Tyre compound={s.compound} isNew={s.newTyres} size={18} />}
@@ -100,6 +103,11 @@ export function PitLane({ onSelect, focus }: { onSelect: (n: string) => void; fo
             );
           })}
         </ul>
+      )}
+      {stops.length > 4 && (
+        <button onClick={() => setAll(!all)} className="mt-2 text-xs font-semibold text-muted hover:text-ink">
+          {all ? "Show fewer" : `Show all ${stops.length} stops`}
+        </button>
       )}
     </Card>
   );

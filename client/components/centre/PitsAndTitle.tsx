@@ -1,16 +1,15 @@
 "use client";
 
 import { useMemo } from "react";
-import { ChevronDown, ChevronUp, Timer } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useLive } from "@/lib/live-context";
 import { useDrivers } from "@/lib/drivers";
-import { list, TYRES, type LiveEvent } from "@/lib/live";
-import { localTime } from "@/lib/format";
-import { Spoiler, TeamBar, Tyre, cn } from "@/components/ui";
+import { list, type LiveEvent } from "@/lib/live";
+import { Spoiler, TeamBar, cn } from "@/components/ui";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export type Stop = { driver: string; lap: number | null; ts: string | null; stationary: number | null; lane: number | null; compound?: string; newTyres?: boolean; change?: number | null };
+export type Stop = { driver: string; lap: number | null; ts: string | null; stationary: number | null; lane: number | null; compound?: string; newTyres?: boolean; change?: number | null; sc?: boolean };
 
 // Pit stops this session: stationary and pit-lane times where the feed has them,
 // plus the tyres fitted and places gained or lost (from the derived race events).
@@ -44,49 +43,16 @@ export function useStops(): Stop[] {
       const exit = exits.find((e) => e.driver === stop.driver && (stop.lap == null || e.lap == null || Math.abs(e.lap - stop.lap) <= 1));
       if (exit) Object.assign(stop, { compound: exit.compound, newTyres: exit.newTyres, change: exit.change, lap: stop.lap ?? exit.lap ?? null, ts: stop.ts ?? exit.ts });
     }
+    // Was the track neutralised (safety car or VSC) when the car stopped? Those stops cost less.
+    const statuses = list<LiveEvent>(topics.Events).filter((e) => e.type === "trackStatus");
+    for (const stop of base) {
+      const at = Date.parse(stop.ts ?? "");
+      if (!at) continue;
+      const status = statuses.filter((e) => Date.parse(e.ts) <= at).at(-1)?.status;
+      stop.sc = ["4", "6", "7"].includes(String(status));
+    }
     return base.sort((a, b) => (Date.parse(b.ts ?? "") || 0) - (Date.parse(a.ts ?? "") || 0));
   }, [topics.Events, topics.PitStopSeries, topics.PitLaneTimeCollection]);
-}
-
-export function PitStops({ focus }: { focus: string | null }) {
-  const { get } = useDrivers();
-  const stops = useStops();
-  const fastest = Math.min(...stops.map((s) => s.stationary ?? Infinity));
-  if (stops.length === 0) return <p className="py-8 text-center text-sm text-muted">No pit stops yet.</p>;
-  return (
-    <ul className="space-y-1">
-      {stops.map((s, i) => {
-        const d = get(s.driver);
-        const best = s.stationary != null && s.stationary === fastest;
-        return (
-          <li key={`${s.driver}-${s.lap}-${i}`} className={cn("flex items-center gap-3 rounded-xl px-2.5 py-2", focus === s.driver ? "bg-surface-2 ring-1 ring-accent/60" : "hover:bg-surface-2")}>
-            <TeamBar colour={d.colour} className="h-6" />
-            <div className="min-w-0 flex-1">
-              <p className="font-display font-bold">{d.tla}</p>
-              <p className="text-xs text-muted">
-                {s.lap ? `Lap ${s.lap}` : localTime(s.ts, { second: "2-digit" })}
-                {s.change ? ` · ${s.change > 0 ? `gained ${s.change}` : `lost ${-s.change}`}` : ""}
-              </p>
-            </div>
-            {s.compound && (
-              <span className="flex items-center gap-1 text-xs text-muted" title={`${s.newTyres ? "New" : "Used"} ${TYRES[s.compound]?.name ?? s.compound}`}>
-                <Tyre compound={s.compound} size={18} isNew={s.newTyres} />
-              </span>
-            )}
-            <div className="w-20 text-right">
-              {s.stationary != null && (
-                <p className={cn("tnum font-display font-bold", best && "text-purple")} title="Stationary time">
-                  {best && <Timer size={12} className="mr-1 inline" />}
-                  {s.stationary.toFixed(1)}s
-                </p>
-              )}
-              {s.lane != null && <p className="tnum text-xs text-muted" title="Time in the pit lane">lane {s.lane.toFixed(1)}s</p>}
-            </div>
-          </li>
-        );
-      })}
-    </ul>
-  );
 }
 
 // The championship as it would stand if the race finished now (from F1's feed).

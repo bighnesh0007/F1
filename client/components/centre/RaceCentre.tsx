@@ -3,7 +3,7 @@
 import { useT } from "@/lib/i18n";
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, Flag, History, Map as MapIcon, MessageCircle, Radio, Sparkles, Timer, Trophy, Tv } from "lucide-react";
+import { ArrowLeft, Flag, Gauge, History, Map as MapIcon, MessageCircle, Radio, Sparkles, Trophy, Tv } from "lucide-react";
 import { useLive } from "@/lib/live-context";
 import { useSettings } from "@/lib/settings";
 import { useDrivers } from "@/lib/drivers";
@@ -27,8 +27,9 @@ import { AskAnalyst } from "./AskAnalyst";
 import { LivePolls } from "./LivePolls";
 import { useWatchedCheckIn } from "./checkin";
 import { DriverFocus } from "./DriverFocus";
-import { LiveChampionship, PitStops } from "./PitsAndTitle";
+import { LiveChampionship } from "./PitsAndTitle";
 import { LiveTicker } from "./LiveTicker";
+import { LiveSpeedTraps } from "./LiveSpeedTraps";
 import { PitLane } from "./PitLane";
 import { ComparePanel } from "./ComparePanel";
 
@@ -36,7 +37,7 @@ import { ComparePanel } from "./ComparePanel";
 const Insights = dynamic(() => import("@/components/live/Insights").then((m) => m.Insights));
 const DriverSheet = dynamic(() => import("@/components/live/DriverSheet").then((m) => m.DriverSheet));
 
-type SideTab = "control" | "radio" | "chat" | "ask" | "pits" | "title";
+type SideTab = "control" | "radio" | "speed" | "chat" | "ask" | "title";
 type MobileTab = "track" | "timing" | "driver" | "charts" | "control" | "radio" | "chat" | "ask";
 
 // A full view of one live session: big map, timing, race control, team radio, a
@@ -79,17 +80,17 @@ export function RaceCentre() {
   const sideTabs = [
     { value: "control" as const, label: `${t("Control")}${messages.length ? ` ${messages.length}` : ""}` },
     { value: "radio" as const, label: `${t("Radio")}${radioCount ? ` ${radioCount}` : ""}` },
+    { value: "speed" as const, label: "Speed" },
     { value: "chat" as const, label: "Chat" },
-    { value: "ask" as const, label: "Ask AI" },
-    { value: "pits" as const, label: "Pits" },
+    { value: "ask" as const, label: "Ask" },
     ...(race ? [{ value: "title" as const, label: "Title" }] : []),
   ];
   const sideTab = side === "title" && !race ? "control" : side;
 
   const sidePanel = (
     <Card
-      title={{ control: "Race control", radio: "Team radio", chat: "Chat", ask: "Ask the analyst", pits: "Pit stops", title: "Live championship" }[sideTab]}
-      icon={{ control: <Flag size={15} />, radio: <Radio size={15} />, chat: <MessageCircle size={15} />, ask: <Sparkles size={15} />, pits: <Timer size={15} />, title: <Trophy size={15} /> }[sideTab]}
+      title={{ control: "Race control", radio: "Team radio", speed: "Speed traps", chat: "Chat", ask: "Ask the analyst", title: "Live championship" }[sideTab]}
+      icon={{ control: <Flag size={15} />, radio: <Radio size={15} />, speed: <Gauge size={15} />, chat: <MessageCircle size={15} />, ask: <Sparkles size={15} />, title: <Trophy size={15} /> }[sideTab]}
     >
       <div className="mb-3 max-lg:hidden [&>div]:flex [&>div]:w-full [&_button]:flex-1">
         <Segmented size="sm" value={sideTab} onChange={setSide} options={sideTabs} />
@@ -97,9 +98,9 @@ export function RaceCentre() {
       <div className="scroll-thin -mr-2 max-h-[min(70vh,720px)] overflow-y-auto pr-2">
         {sideTab === "control" && <RaceControlList focus={focus} />}
         {sideTab === "radio" && <RadioPlayer focus={focus} />}
+        {sideTab === "speed" && <LiveSpeedTraps focus={focus} onSelect={select} />}
         {sideTab === "chat" && <Chat />}
         {sideTab === "ask" && <AskAnalyst focusName={focus ? get(focus).fullName : null} />}
-        {sideTab === "pits" && <PitStops focus={focus} />}
         {sideTab === "title" && <LiveChampionship />}
       </div>
     </Card>

@@ -68,3 +68,18 @@ describe("flags", () => {
     expect(yellowSectors([{ flag: "YELLOW", scope: "Sector", sector: 2 }, { flag: "GREEN", scope: "Track" }]).size).toBe(0);
   });
 });
+
+import { wearByStint } from "../lib/tyres";
+
+describe("tyre wear", () => {
+  it("splits stints at pit stops and measures the slowdown per lap", () => {
+    const lap = (n: number, time: string, compound: string, pit = false) => ({ lap: n, time, compound, pit });
+    const stints = wearByStint([
+      lap(1, "1:31.000", "SOFT"), lap(2, "1:31.100", "SOFT"), lap(3, "1:31.200", "SOFT"), lap(4, "1:31.300", "SOFT", true),
+      lap(5, "1:45.000", "HARD"), lap(6, "1:32.000", "HARD"), lap(7, "1:32.050", "HARD"), lap(8, "1:32.100", "HARD"),
+    ]);
+    expect(stints.map((s) => s.compound)).toEqual(["SOFT", "HARD"]);
+    expect(stints[0].slope).toBeCloseTo(0.1);
+    expect(stints[1].points.map((p) => p.age)).toEqual([2, 3, 4]); // the out-lap is left out
+  });
+});
