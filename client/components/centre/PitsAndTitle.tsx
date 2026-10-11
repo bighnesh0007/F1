@@ -10,11 +10,11 @@ import { Spoiler, TeamBar, Tyre, cn } from "@/components/ui";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-type Stop = { driver: string; lap: number | null; ts: string | null; stationary: number | null; lane: number | null; compound?: string; newTyres?: boolean; change?: number | null };
+export type Stop = { driver: string; lap: number | null; ts: string | null; stationary: number | null; lane: number | null; compound?: string; newTyres?: boolean; change?: number | null };
 
 // Pit stops this session: stationary and pit-lane times where the feed has them,
 // plus the tyres fitted and places gained or lost (from the derived race events).
-function useStops(): Stop[] {
+export function useStops(): Stop[] {
   const { topics } = useLive();
   return useMemo(() => {
     const exits = list<LiveEvent>(topics.Events).filter((e) => e.type === "pitOut" && e.driver);

@@ -28,6 +28,8 @@ import { LivePolls } from "./LivePolls";
 import { useWatchedCheckIn } from "./checkin";
 import { DriverFocus } from "./DriverFocus";
 import { LiveChampionship, PitStops } from "./PitsAndTitle";
+import { LiveTicker } from "./LiveTicker";
+import { PitLane } from "./PitLane";
 
 // Charts in the driver sheet load when it is first opened.
 const Insights = dynamic(() => import("@/components/live/Insights").then((m) => m.Insights));
@@ -111,6 +113,8 @@ export function RaceCentre() {
         }
       />
 
+      <LiveTicker onSelect={(n) => { setPicked(n); setCleared(false); }} />
+
       <div className="scroll-thin -mx-1 overflow-x-auto px-1 lg:hidden [&>div]:flex [&>div]:min-w-full [&_button]:flex-1 [&_button]:px-2.5 [&_button]:whitespace-nowrap">
         <Segmented
           value={mobile}
@@ -133,17 +137,26 @@ export function RaceCentre() {
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(340px,390px)_minmax(0,1fr)] xl:grid-cols-[minmax(360px,390px)_minmax(0,1fr)_minmax(340px,390px)]">
         <div className={cn("lg:sticky lg:top-20", show("timing"))}>
-          <TimingTower onSelect={select} />
+          <TimingTower onSelect={select} focus={focus} />
         </div>
 
         <div className="min-w-0 space-y-4">
           <div className={show("track")}>
             <LiveTrackMap onSelect={select} focus={focus} mapClassName="aspect-[4/3] lg:aspect-[16/10]" overlay={<LatestMessageBanner />} />
           </div>
+          {race && (
+            <div className={show("track")}>
+              <PitLane onSelect={select} focus={focus} />
+            </div>
+          )}
           <div className={show("driver")}>
             <DriverFocus
               number={focus}
               onProfile={setProfile}
+              onPick={(n) => {
+                setPicked(n);
+                setCleared(false);
+              }}
               onClear={() => {
                 setPicked(null);
                 setCleared(true);

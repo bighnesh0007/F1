@@ -1,8 +1,9 @@
 "use client";
 
-import { Crosshair, Gauge, UserRound, X } from "lucide-react";
+import { Crosshair, Gauge, Star, UserRound, X } from "lucide-react";
 import { useLive } from "@/lib/live-context";
 import { useDrivers } from "@/lib/drivers";
+import { useSettings } from "@/lib/settings";
 import { isRaceSession, list, TYRES } from "@/lib/live";
 import { Card, Headshot, TeamBar, Tyre, cn } from "@/components/ui";
 import { useTowerRows } from "@/components/live/TimingTower";
@@ -12,16 +13,50 @@ import { useTowerRows } from "@/components/live/TimingTower";
 // Mini-sector status codes from the timing feed.
 const SEGMENT: Record<number, string> = { 2048: "bg-yellow", 2049: "bg-good", 2051: "bg-purple", 2064: "bg-blue-500" };
 
-export function DriverFocus({ number, onClear, onProfile }: { number: string | null; onClear: () => void; onProfile: (n: string) => void }) {
+// Every driver as a chip, in running order, to choose who to follow.
+function DriverPicker({ selected, onPick }: { selected: string | null; onPick: (n: string) => void }) {
+  const { get } = useDrivers();
+  const { settings } = useSettings();
+  const rows = useTowerRows();
+  return (
+    <div className="scroll-thin -mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1" role="listbox" aria-label="Choose a driver to follow">
+      {rows.map((r) => {
+        const d = get(r.number);
+        const on = selected === r.number;
+        return (
+          <button
+            key={r.number}
+            role="option"
+            aria-selected={on}
+            onClick={() => onPick(r.number)}
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-bold transition-colors",
+              on ? "border-transparent text-white" : "border-line text-muted hover:text-ink",
+            )}
+            style={on ? { background: `#${d.colour}` } : undefined}
+          >
+            {!on && <TeamBar colour={d.colour} className="h-3" />}
+            <span className="font-display">{d.tla}</span>
+            {settings.favouriteDriver === r.number && <Star size={10} className="fill-current" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function DriverFocus({ number, onClear, onProfile, onPick }: { number: string | null; onClear: () => void; onProfile: (n: string) => void; onPick: (n: string) => void }) {
   const { topics } = useLive();
   const { get } = useDrivers();
+  const { settings, update } = useSettings();
   const rows = useTowerRows();
   const race = isRaceSession(topics);
 
   if (!number) {
     return (
       <Card title="Driver focus" icon={<Crosshair size={15} />}>
-        <p className="py-4 text-center text-sm text-muted">Tap a car on the map or a driver in the timing to follow them here.</p>
+        <DriverPicker selected={null} onPick={onPick} />
+        <p className="py-4 text-center text-sm text-muted">Pick a driver above, or tap a car on the map or a row in the timing.</p>
       </Card>
     );
   }
@@ -45,6 +80,14 @@ export function DriverFocus({ number, onClear, onProfile }: { number: string | n
       icon={<Crosshair size={15} />}
       right={
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => update({ favouriteDriver: settings.favouriteDriver === number ? null : number })}
+            aria-pressed={settings.favouriteDriver === number}
+            title={settings.favouriteDriver === number ? "Your driver (followed by default)" : "Make this your driver: followed by default and highlighted everywhere"}
+            className={cn("flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold hover:bg-surface-2", settings.favouriteDriver === number ? "text-accent" : "text-muted hover:text-ink")}
+          >
+            <Star size={13} className={settings.favouriteDriver === number ? "fill-current" : ""} /> {settings.favouriteDriver === number ? "My driver" : "Set as mine"}
+          </button>
           <button onClick={() => onProfile(number)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-ink">
             <UserRound size={13} /> Profile
           </button>
@@ -54,6 +97,7 @@ export function DriverFocus({ number, onClear, onProfile }: { number: string | n
         </div>
       }
     >
+      <DriverPicker selected={number} onPick={onPick} />
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <div className="space-y-3">
           <div className="relative overflow-hidden rounded-2xl p-3" style={{ background: `linear-gradient(135deg, #${d.colour}45, transparent 75%)` }}>
