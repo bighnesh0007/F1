@@ -214,6 +214,17 @@ To open the app at your own address (e.g. `https://f1.bighnesh.space`) whenever 
    ```
 5. Run `docker compose up --build`. The `f1-tunnel` container connects out to Cloudflare, and the site is live at `https://f1.bighnesh.space` with HTTPS. Stop the containers and the site goes offline.
 
+### Start automatically when the computer boots
+
+Every container has `restart: unless-stopped`, so Docker brings them back after a reboot. You only need Docker itself to start at boot, and to run the app once in the background:
+
+```bash
+sudo systemctl enable --now docker   # start Docker at boot
+docker compose up -d --build         # run in the background (from the project folder)
+```
+
+To update later, run `git pull && docker compose up -d --build`. `docker compose stop` or `down` takes the site offline until you run `up -d` again. Logs: `docker compose logs -f`.
+
 For sign-in on that address, add `f1.bighnesh.space` to your Clerk app as well (Clerk dashboard → Domains), especially if you use production keys.
 
 ## Optional services
