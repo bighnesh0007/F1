@@ -199,6 +199,23 @@ server/   Node.js + Express                                 → http://localhost
 docker-compose.yml
 ```
 
+## Your own domain (Cloudflare Tunnel)
+
+To open the app at your own address (e.g. `https://f1.bighnesh.space`) whenever `docker compose up` is running, without opening ports on your router:
+
+1. **Put the domain on Cloudflare.** In Cloudflare, add the site `bighnesh.space` (the Free plan is fine). Cloudflare gives you two nameservers. At your registrar (Hostinger → Domains → bighnesh.space → DNS / Nameservers), replace the current nameservers with those two. Copy over any DNS records you still need first, because whatever the old nameservers served stops being used.
+2. **Create a tunnel.** Cloudflare dashboard → Zero Trust → Networks → Tunnels → Create a tunnel → Cloudflared. Name it `f1`, then skip the install step. Docker runs cloudflared for you.
+3. **Add a public hostname.** In the tunnel, set subdomain `f1`, domain `bighnesh.space`, and service `HTTP` → `client:3000`.
+4. **Add these lines to `.env`** (the tunnel token is a secret, so keep it only in `.env`):
+   ```
+   COMPOSE_PROFILES=tunnel
+   CLOUDFLARE_TUNNEL_TOKEN=<token shown when you created the tunnel>
+   PUBLIC_URL=https://f1.bighnesh.space
+   ```
+5. Run `docker compose up --build`. The `f1-tunnel` container connects out to Cloudflare, and the site is live at `https://f1.bighnesh.space` with HTTPS. Stop the containers and the site goes offline.
+
+For sign-in on that address, add `f1.bighnesh.space` to your Clerk app as well (Clerk dashboard → Domains), especially if you use production keys.
+
 ## Optional services
 
 **Push notifications.** Generate keys once and put them in `.env`:

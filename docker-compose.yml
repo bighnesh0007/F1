@@ -61,6 +61,21 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Publishes the app at your own domain (e.g. https://f1.bighnesh.space) through a
+  # Cloudflare Tunnel: no open ports or fixed IP needed. Starts with the rest when
+  # COMPOSE_PROFILES=tunnel and CLOUDFLARE_TUNNEL_TOKEN are set in .env (see README).
+  tunnel:
+    image: cloudflare/cloudflared:2026.9.3
+    container_name: f1-tunnel
+    profiles: ["tunnel"]
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      client:
+        condition: service_started
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     container_name: f1-redis
